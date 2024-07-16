@@ -1,27 +1,128 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import pandas as pd
+from dataclasses import dataclass, field
 
-class RingdownSeries:
-    def __init__(self, series):
-        self.raw_series = series
+@dataclass
+class Ringdown:
+    """Class that gives a single ringdown 
+    and some methods to work on it"""
+    name: str # name of the ringdown i.e. ringdown47
+    timetrace: list # actual trace; given in Voltages measured in Scope's channel
+    tInc: float # time increment; spacing between each data point in time trace
 
-    def __iter__(self, log=False):
-        if log==True:
-            return [np.log(series) for series in self.raw_series)]
-        else:
-            return [series for series in self.raw_series]
+    def __post_init__(self):
+        self.t = np.arange(0, len(self.timetrace)*self.tInc, self.tInc)
+        self.timetrace -= 1.001 * np.min(self.timetrace) # such that 0 is the bottom
+        self.auto_window()
 
-    def __len__(self):
-        return len(self.raw_series)
+    def set_window(self, t0: float, t1: float):
+        self.t0 = t0
+        self.t1 = t1
 
-    def __getitem__(self, index, log=False):
-        if log:
-            return np.log(self.raw_series[index])
-        else:
-            return self.raw_series[index]
+    def auto_window(self, window_length: float = 6e-6, rolloff: float = 1e-6):
+        max_time = self.t[np.argmax(self.timetrace)]
+        self.t0 = max_time + rolloff
+        self.t1 = self.t0 + window_length
 
-    def __repr__(self) -> str:
-        return "Ringdown series"
 
-    def __str__(self) -> str:
-        return "A collection of ringdowns."
+    def crop_mask(self) -> np.ndarray:
+        """Generate a mask that can window any array. Is a helper function""" 
+        mask = np.logical_and(self.t >= self.t0, self.t <= self.t1)
+        return mask
+
+
+    def crop_timetrace(self) -> np.ndarray:
+        """Crop timetrace."""
+        mask = self.crop_mask()
+        return self.timetrace[mask]
+
+    def crop_time(self) -> np.ndarray:
+        """Returns the windowed
+        section of the full time array"""
+        mask = self.crop_mask()
+        return self.t[mask]
+
+    def log_timetrace(self) -> np.ndarray:
+        """Crop a time trace between t0 and t1.
+        Offset it so the log does not throw an error.
+        Then take a log of timetrace."""
+        return np.log(self.crop_timetrace())
+
+    def fit_timetrace(self):
+        """Crop, log and then fit timetrace
+        between t0 and t1.
+        Return the fit object."""
+        log_decay = self.log_timetrace()
+        t = self.crop_time()
+        t -= t[0] # so the time series starts at t=0
+        fit = np.polynomial.Polynomial.fit(t, log_decay, deg=1)
+        return fit
+
+
+@dataclass(order=True)
+class RingdownCollection:
+    name: str # name of this collection i.e. 202440706_Ringdown
+    path: str # abs path to the folder containing individual ringdowns
+    fits: list = field(default_factory=list, compare=False, hash=False, repr=False)
+
+    def __post_init__(self, channel='CH1(V)'):
+        # load the files i.e. ringdowns
+        os.path.expanduser(self.path)
+        filenames = [f for f in os.listdir(self.path) if f.endswith('.csv')]
+        get_tInc = lambda df: float(df.head(0).to_string().split(',')[-2].split('=')[-1].split('s')[0])
+        self.ringdowns = []
+        for filename in filenames:
+            print(filename)
+            def convert_float(x):
+                if isinstance(x, float) is not True:
+                    try:
+                        float(x.strip().replace(' ',''))
+                    except (ValueError, TypeError):
+                        print('nope')
+                        return np.nan
+            df = pd.read_csv(os.path.join(self.path, filename), 
+                             usecols=[channel],
+                             converters={'CH1(V)':convert_float}
+                             )
+            header = pd.read_csv(os.path.join(self.path, filename), nrows=0)
+            tInc = get_tInc(header)
+            print(df)
+            print(df[channel])
+            timetrace = np.array(df)
+            print(timetrace)
+            ringdown = Ringdown(name=filename, timetrace=timetrace, tInc=tInc)
+            self.ringdowns.append(ringdown)
+
+    def __getitem__(self, index):
+        return self.ringdowns[index]
+
+    def fit_ringdowns(self, window=None):
+        """Populate self.fits with fits to the ringdown.
+        Peforms a polynomial fit f(x) = A + B x.
+        Given that the mathematical model is I(t) = -1/tau t + A.
+        Also returns an array of tau"""
+        if window is not None:
+            assert len(window) == 2
+            [ringdown.set_window(t0, t1) for ringdown in self.ringdowns]
+        self.fits = [ringdown.fit_timetrace() for ringdown in self.ringdowns]
+        return [-1/fit.convert().coef[1] for fit in self.fits]
+
+
+
+
+def main():
+    ringdowns = RingdownCollection("test", "/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_10/")
+    taus = ringdowns.fit_ringdowns()
+    print(taus)
+
+if __name__ == '__main__':
+    main()
+    
+
+    
+
+
+
+

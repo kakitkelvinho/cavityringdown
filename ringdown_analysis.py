@@ -15,6 +15,8 @@ def exponential_decay(t, tau):
 experiment = '20240708_Ringdown' # this sort of depends on where your specific experimental data is
 all_data = '~/LabInnsbruck/WindowsData' # please change depending on where you put your data dir
 data_dir = os.path.expanduser(os.path.join(all_data, experiment))
+print(os.path.join(all_data,experiment) == '~/LabInnsbruck/WindowsData/20240708_Ringdown')
+
 # look inside the experiment directory
 
 csv_filenames = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
@@ -24,6 +26,7 @@ tInc = 5e-10 # maybe not have to hardcode this?
 for filename in csv_filenames:
     fullpath = os.path.join(data_dir, filename)
     df = pd.read_csv(fullpath)
+    # print(float(df.head(0).to_string().split(',')[-2].split('=')[-1].split('s')[0]))
     decay = df['CH1(V)']
     decays.append(decay)
 
@@ -58,7 +61,7 @@ log_decays = [np.log(decay) for decay in cropped_decays]
 # then you can fit
 for decay in log_decays:
     p_fitted = np.polynomial.Polynomial.fit(t_cropped_offset, decay, deg=1)
-    print(p_fitted.convert().coef)
+    print(p_fitted, p_fitted.coef)
 
 
 # plot log data

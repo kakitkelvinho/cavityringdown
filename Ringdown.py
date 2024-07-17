@@ -9,7 +9,7 @@ class Ringdown:
     """Class that gives a single ringdown 
     and some methods to work on it"""
     name: str # name of the ringdown i.e. ringdown47
-    timetrace: list # actual trace; given in Voltages measured in Scope's channel
+    timetrace: np.ndarray # actual trace; given in Voltages measured in Scope's channel
     tInc: float # time increment; spacing between each data point in time trace
 
     def __post_init__(self):
@@ -59,6 +59,8 @@ class Ringdown:
         t -= t[0] # so the time series starts at t=0
         fit = np.polynomial.Polynomial.fit(t, log_decay, deg=1)
         return fit
+    
+
 
 
 @dataclass(order=True)
@@ -127,6 +129,51 @@ class RingdownCollection:
         except (ValueError, TypeError):
             print(f"error encountered with {x}")  
             return np.nan
+
+
+class RingdownFitting(Ringdown):
+
+    def __init__(self, name: str, timetrace: np.ndarray, tInc: float):
+        super().__init__(name, timetrace, tInc)
+        self.N = len(super().timetrace)
+
+    def sum_I(self):
+        return np.sum(super().timetrace)
+
+    def sum_It(self):
+        return np.sum(super().t * super().timetrace)
+
+    def sum_t(self):
+        return np.sum(super().t)
+
+    def sum_Isquared(self):
+        return np.sum(super().timetrace * super().timetrace)
+
+    def sum_delta(self):
+        return len(super().timetrace) * self.sum_Isquared() - (self.sum_I())**2
+
+
+    def calc_A(self):
+        """Model: I = A + B t"""
+        self.A = (self.sum_Isquared() * self.sum_t() - self.sum_I() * self.sum_It())/self.sum_delta()
+        return self.A
+
+    def calc_B(self):
+        """Model: I = A + B t"""
+        self.B = (len(super().timetrace)* self.sum_It() - self.sum_I() * self.sum_t())/self.sum_delta()
+        return self.B
+
+    def delta_I(self):
+        self.delta_I = np.sqrt((1/(self.N -2) * np.sum((super().timetrace - self.A - self.B * super().t)**2)))
+        return self.delta_I
+    
+    def delta_A(self):
+        self.delta_A = self.delta_I * np.sqrt(np.sum(super().t * super().t)/self.sum_delta())
+        return self.delta_A
+
+    def delta_B(self):
+        self.delta_B = self.delta_I * np.sqrt(self.N / self.sum_delta())
+
 
 
 

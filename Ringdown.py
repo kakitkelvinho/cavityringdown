@@ -74,24 +74,17 @@ class RingdownCollection:
         get_tInc = lambda df: float(df.head(0).to_string().split(',')[-2].split('=')[-1].split('s')[0])
         self.ringdowns = []
         for filename in filenames:
-            print(filename)
-            def convert_float(x):
-                if isinstance(x, float) is not True:
-                    try:
-                        float(x.strip().replace(' ',''))
-                    except (ValueError, TypeError):
-                        print('nope')
-                        return np.nan
-            df = pd.read_csv(os.path.join(self.path, filename), 
-                             usecols=[channel],
-                             converters={'CH1(V)':convert_float}
-                             )
-            header = pd.read_csv(os.path.join(self.path, filename), nrows=0)
-            tInc = get_tInc(header)
-            print(df)
-            print(df[channel])
-            timetrace = np.array(df)
-            print(timetrace)
+            #print(filename)
+            try:
+                df = pd.read_csv(os.path.join(self.path, filename), 
+                    usecols=[channel],
+                    dtype=float,
+                    )
+                header = pd.read_csv(os.path.join(self.path, filename), nrows=0)
+                tInc = get_tInc(header)
+                timetrace = np.array(df[channel]).astype(float)
+            except ValueError:
+                continue
             ringdown = Ringdown(name=filename, timetrace=timetrace, tInc=tInc)
             self.ringdowns.append(ringdown)
 
@@ -110,12 +103,42 @@ class RingdownCollection:
         return [-1/fit.convert().coef[1] for fit in self.fits]
 
 
+        # helper function for conversion
+    def convert_float(self, x):
+        try: 
+            # common replacements
+            x = x.replace('\\x05', 'E')
+            x = x.replace(' ','')
+            x = x.replace('&','.')
+            x = x.replace(' ','')
+            x = x.replace(')','E')
+            x = x.replace('D','E')
+            # if E is there but the next sign is gone
+            if x[-3] == 'E':
+                x = f"{x[:-2]}-{x[-2:]}"
+            # if E is missing
+            if x[-4] != 'E':
+                x = f"{x[:-3]}E{x[-3:]}" 
+            if 'E' in x:
+                parts = x.split('E')
+                if len(parts) == 2 and not (parts[1].startswith('+') or parts[1].startswith('-')):
+                    x += '-02'
+            return float(x)
+        except (ValueError, TypeError):
+            print(f"error encountered with {x}")  
+            return np.nan
+
 
 
 def main():
-    ringdowns = RingdownCollection("test", "/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_10/")
-    taus = ringdowns.fit_ringdowns()
-    print(taus)
+    angles = np.arange(0, 190, 10)
+    for angle in angles:
+        print(f"Beginning parsing {angle}")
+        ringdowns = RingdownCollection("test", f"/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_{angle}")
+        taus = ringdowns.fit_ringdowns()
+        print(len(taus))
+        print(np.mean(taus))
+        print(np.argwhere(np.isnan(taus)))
 
 if __name__ == '__main__':
     main()

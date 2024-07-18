@@ -76,7 +76,7 @@ class RingdownCollection:
         get_tInc = lambda df: float(df.head(0).to_string().split(',')[-2].split('=')[-1].split('s')[0])
         self.ringdowns = []
         for filename in filenames:
-            #print(filename)
+            print(filename)
             try:
                 df = pd.read_csv(os.path.join(self.path, filename), 
                     usecols=[channel],
@@ -178,7 +178,8 @@ class RingdownFitting(Ringdown):
 
 
 def main():
-    angles = np.arange(0, 190, 10)
+    #angles = np.arange(0, 190, 10)
+    angles = [100]
     for angle in angles:
         print(f"Beginning parsing {angle}")
         ringdowns = RingdownCollection("test", f"/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_{angle}")

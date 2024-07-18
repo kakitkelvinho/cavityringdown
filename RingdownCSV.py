@@ -33,7 +33,7 @@ class RingdownCSV:
         # cropping the basic attributes or taking the log
         self.croptime = self.t[self.crop_mask()]
         self.croptime_offset = self.croptime - self.croptime[0]
-        self.logtimetrace = np.log(self.crop_timetrace())
+        self.logtimetrace = np.log(self.timetrace[self.crop_mask()])
         self.fit_by_hand()
         
     # Fitting methods
@@ -123,16 +123,9 @@ class RingdownCSV:
         mask = np.logical_and(self.t >= self.t0, self.t <= self.t1)
         return mask
 
-    def crop_timetrace(self):
-        self.timetrace = self.timetrace[self.crop_mask()]
-        return self.timetrace
-
-
-
-
 def get_csv(filename: str, index:int=0):
     timetrace = []
-    with open(filename, mode='r', encoding='utf-8') as csv_file:
+    with open(filename, mode='r', encoding='ascii') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         line_count = 0
         tInc = 0.

@@ -21,21 +21,37 @@ class RingdownCSV:
 
 
 
-    def __post_init__(self, rolloff:float=0.3e-6, window_length=5e-6):
+    def __post_init__(self):
         # basic attributes
         self.name = self.csv_path.split('/')[-1].replace('.csv','')
         self.timetrace, self.tInc = get_csv(self.csv_path) 
         self.timetrace -= np.min(self.timetrace) + 1e-12 # 1e-12 to prevent log of zero
         self.n = len(self.timetrace)
         self.t = np.arange(0, self.n * self.tInc, self.tInc)
-        self.t0 = self.t[np.argmax(self.timetrace)] + rolloff
-        self.t1 = self.t0 + window_length
-        # cropping the basic attributes or taking the log
+        self.auto_set_window()
+        self.cropping_routine()
+
+    def cropping_routine(self):
         self.croptime = self.t[self.crop_mask()]
         self.croptime_offset = self.croptime - self.croptime[0]
         self.logtimetrace = np.log(self.timetrace[self.crop_mask()])
         self.fit_by_hand()
-        
+
+    def auto_set_window(self, rolloff:float=0.3e-6, window_length:float=6e-6): 
+        # cropping the basic attributes or taking the log
+        self.t0 = self.t[np.argmax(self.timetrace[:round(self.n/2)])] + rolloff # find the max that lies in the first half of the array
+        self.t1 = self.t0 + window_length
+
+    def set_window(self, t0:float, t1:float):
+        self.t0 = t0
+        self.t1 = t1
+        self.cropping_routine()
+
+    def crop_mask(self):
+        mask = np.logical_and(self.t >= self.t0, self.t <= self.t1)
+        return mask
+
+   
     # Fitting methods
     def fit_with_numpy(self):
         fit = np.polynomial.Polynomial.fit(self.croptime_offset, self.logtimetrace, deg=1)
@@ -112,17 +128,7 @@ class RingdownCSV:
         if save:
             plt.savefig('log_timetrace.png', dpi=300)
         plt.show();
-
-  
-
-    def set_window(self, t0:float, t1:float):
-        self.t0 = t0
-        self.t1 = t1
-
-    def crop_mask(self):
-        mask = np.logical_and(self.t >= self.t0, self.t <= self.t1)
-        return mask
-
+    
 def get_csv(filename: str, index:int=0):
     timetrace = []
     with open(filename, mode='r', encoding='ascii') as csv_file:

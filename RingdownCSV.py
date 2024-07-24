@@ -1,8 +1,8 @@
 import numpy as np
-import csv
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from loading import get_csv
 
 @dataclass
 class RingdownCSV:
@@ -138,41 +138,13 @@ class RingdownCSV:
                       marker='.', markersize=1, linestyle='')
         # we also plot the empirical/sample standard deviation
         # this is to check whether our points lie within 1 s.d. of our model
-        residual.axhline(self.handfitdict['delta_y'], color='black', ls='--')
-        residual.axhline(-self.handfitdict['delta_y'], color='black', ls='--')
+        residual.axhline(self.handfitdict['delta_y'], color='black', ls='--', label='+$\\sigma_y$')
+        residual.axhline(-self.handfitdict['delta_y'], color='black', ls='--', label='-$\\sigma_y$')
         residual.set_ylabel("Residual")
         residual.set_xlabel("Time (s)")
         if save:
             plt.savefig('log_timetrace.png', dpi=300)
         plt.show();
-    
-def get_csv(filename: str, index:int=0):
-    timetrace = []
-    with open(filename, mode='r', encoding='ascii') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        line_count = 0
-        tInc = 0.
-        tmp = 0.
-        for row in csv_reader:
-            if line_count == 0:
-                headers = row
-                tInc = [header for header in headers if "tInc" in header]
-                tInc = float(tInc[0].split('=')[-1].split('s')[0])
-                line_count += 1
-            else:
-                channel = row[index]
-                try:
-                    float(channel)
-                except Exception as e:
-                    print(f"{e} with row {line_count}, replace {channel} with {tmp}")
-                    channel = tmp
-                timetrace.append(float(channel))
-                tmp = channel
-                line_count += 1
-    timetrace = np.array(timetrace)
-    return timetrace, tInc
- 
-
 
 
 def main():

@@ -11,7 +11,7 @@ class RingdownCollection:
     name: str = field(init=False)
     path: str # path to folder which contains a bunch of csv of ringdowns
     ringdowns: list = field(default_factory=list, init=False)
-    fitdicts: list = field(init=False)
+    fitdicts: dict = field(init=False)
 
     def __post_init__(self):
         self.name = self.path.split('/')[-2]
@@ -26,6 +26,8 @@ class RingdownCollection:
             self.ringdowns.append(ringdown)
 
     def __getitem__(self, key: Union[str, int]) -> RingdownCSV:
+        """For convenience and intuitiveness you can call ringdowns by indexing
+        with its name or an int."""
         if isinstance(key, int):
             return self.ringdowns[key]
         elif isinstance(key, str):
@@ -33,18 +35,30 @@ class RingdownCollection:
             return ringdowns_dict[key]
         else:
             raise TypeError("Key must either be an integer (index) or a string (name, as key to dictionary).")
-            
-    def fit_all_ringdowns(self):
-        self.fitdicts= [ringdown.fit_by_hand() for ringdown in self.ringdowns]
+
+
+    def fit_all_ringdowns(self) -> dict:
+        self.fitdicts= {ringdown.name: ringdown.fit_by_hand() for ringdown in self.ringdowns}
         return self.fitdicts
 
-    def get_decay_constants(self):
+    def get_decay_constants(self) -> dict:
         return {ringdown.name: ringdown.get_decay_constant() for ringdown in self.ringdowns}
 
-    def estimate_finesses(self):
-        return {ringdown.name:ringdown.estimate_finesse() for ringdown in self.ringdowns}
+    def estimate_finesses(self) -> dict:
+        return {ringdown.name: ringdown.estimate_finesse() for ringdown in self.ringdowns}
 
     # Plotting methods
+
+    def plot_logtimetraces(self, fontsize=20):
+        plt.figure(figsize=(10,8))
+        plt.style.use('ggplot')
+        for ringdown in self.ringdowns:
+            plt.plot(ringdown.croptime_offset, ringdown.logtimetrace, label=ringdown.name)
+        plt.legend()
+        plt.title(f"Log of all ringdowns for {self.name}")
+        plt.ylabel("Log of voltage",fontsize=fontsize)
+        plt.xlabel("Time (s)", fontsize=fontsize)
+        plt.show()
 
     def plot_decay_constants(self, fontsize=20):
         plt.figure(figsize=(10,8))
@@ -58,7 +72,8 @@ class RingdownCollection:
 def main():
     ringdowns = RingdownCollection('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/')
     ringdowns['ringdown2'].set_window(13e-6, 20e-6)
-    ringdowns.plot_decay_constants()
+    #ringdowns.plot_decay_constants()
+    ringdowns.plot_logtimetraces()
     #ringdown = RingdownCSV('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/ringdown2.csv')
     #ringdown.set_window(13e-6, 20e-6)
     #ringdown.plot_timetrace()

@@ -70,15 +70,15 @@ class RingdownCollection:
         plt.show()
 
 def main():
-    ringdowns = RingdownCollection('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/')
-    ringdowns['ringdown2'].set_window(13e-6, 20e-6)
+    #ringdowns = RingdownCollection('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/')
+    #ringdowns['ringdown2'].set_window(13e-6, 20e-6)
     #ringdowns.plot_decay_constants()
-    ringdowns.plot_logtimetraces()
-    #ringdown = RingdownCSV('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/ringdown2.csv')
-    #ringdown.set_window(13e-6, 20e-6)
-    #ringdown.plot_timetrace()
-    #ringdown.plot_logtimetrace()
-    #print(ringdown.estimate_finesse())
+    #ringdowns.plot_logtimetraces()
+    ringdown = RingdownCSV('/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_50/ringdown2.csv')
+    ringdown.set_window(13e-6, 17e-6)
+    ringdown.plot_timetrace()
+    ringdown.plot_logtimetrace()
+    print(ringdown.estimate_finesse())
 
 
 if __name__ == '__main__':

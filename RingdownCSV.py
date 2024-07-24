@@ -2,6 +2,7 @@ import numpy as np
 import csv
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 @dataclass
 class RingdownCSV:
@@ -37,7 +38,7 @@ class RingdownCSV:
         self.logtimetrace = np.log(self.timetrace[self.crop_mask()])
         self.fit_by_hand()
 
-    def auto_set_window(self, rolloff:float=0.3e-6, window_length:float=6e-6): 
+    def auto_set_window(self, rolloff:float=0.5e-6, window_length:float=4e-6): 
         # cropping the basic attributes or taking the log
         self.t0 = self.t[np.argmax(self.timetrace[:round(self.n/2)])] + rolloff # find the max that lies in the first half of the array
         self.t1 = self.t0 + window_length
@@ -113,18 +114,34 @@ class RingdownCSV:
         plt.show();
 
     def plot_logtimetrace(self, save=False):
-        plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(10,10))
         plt.style.use('ggplot')
-        plt.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace');
-        #if self.numpyfitobj:
-        #    plt.plot(self.croptime_offset, self.numpyfitobj(self.croptime_offset), label="numpy fit")
+        gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+        logplot =  fig.add_subplot(gs[0])
+        residual = fig.add_subplot(gs[1])
+        logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
+                     marker='.', markersize=1, ls='');
         a = self.handfitdict['A']
         b = self.handfitdict['B']
-        plt.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit")
-        plt.title(f'{self.name} log timetrace');
-        plt.legend()
-        plt.xlabel("time (s)")
-        plt.ylabel("Log of Voltage (V)")
+        a_max, a_min = a+self.handfitdict['delta_A'], a-self.handfitdict['delta_A']
+        b_max, b_min = b+self.handfitdict['delta_B'], b-self.handfitdict['delta_B']
+        logplot.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit")
+        # we also plot given the errors the largest and smallest bounds for error
+        logplot.plot(self.croptime_offset, a_max+b_min*self.croptime_offset, label="upper bound")
+        logplot.plot(self.croptime_offset, a_min+b_max*self.croptime_offset, label="lower bound")
+        logplot.set_title(f'{self.name} log timetrace');
+        logplot.legend()
+        logplot.set_xlabel("Time (s)")
+        logplot.set_ylabel("log of voltage (v)")
+        # we next plot the residuals
+        residual.plot(self.croptime_offset, self.logtimetrace-a-b*self.croptime_offset,
+                      marker='.', markersize=1, linestyle='')
+        # we also plot the empirical/sample standard deviation
+        # this is to check whether our points lie within 1 s.d. of our model
+        residual.axhline(self.handfitdict['delta_y'], color='black', ls='--')
+        residual.axhline(-self.handfitdict['delta_y'], color='black', ls='--')
+        residual.set_ylabel("Residual")
+        residual.set_xlabel("Time (s)")
         if save:
             plt.savefig('log_timetrace.png', dpi=300)
         plt.show();

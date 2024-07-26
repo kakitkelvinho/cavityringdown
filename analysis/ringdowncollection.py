@@ -1,4 +1,4 @@
-from RingdownCSV import RingdownCSV
+from analysis.ringdowncsv import RingdownCSV
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -8,13 +8,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class RingdownCollection:
-    name: str = field(init=False)
-    path: str # path to folder which contains a bunch of csv of ringdowns
-    ringdowns: list = field(default_factory=list, init=False)
-    fitdicts: dict = field(init=False)
+    name: str = field(default="None provided", init=False)
+    path: str = field(repr=False)# path to folder which contains a bunch of csv of ringdowns
+    ringdowns: list = field(default_factory=list, init=False, repr=False)
+    fitdicts: dict = field(init=False, repr=False)
 
     def __post_init__(self):
-        self.name = self.path.split('/')[-2]
+        self.name = self.path.split('/')[-1]
         os.path.expanduser(self.path)
         filenames = [f for f in os.listdir(self.path) if f.endswith('.csv')]
         for filename in tqdm(filenames):

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from loading import get_csv
+from analysis.loading import get_csv
 from dataclasses import dataclass, field
 
 @dataclass

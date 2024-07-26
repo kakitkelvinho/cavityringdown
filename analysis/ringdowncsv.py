@@ -2,25 +2,25 @@ import numpy as np
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from loading import get_csv
+from analysis.loading import get_csv
 
 
 @dataclass
 class RingdownCSV:
-    name: str =  field(init=False) # name of the ringdown
-    csv_path: str # path to csv file (full path)
-    timetrace: np.ndarray = field(init=False) # array to store timetrace
-    croptimetrace: np.ndarray = field(init=False) # crop of timetrace
-    logtimetrace: np.ndarray = field(init=False) # log of timetrace (from crop of timetrace)
-    croptime: np.ndarray = field(init=False) # window out the time
-    croptime_offset: np.ndarray = field(init=False) # shift array to start at t=0
-    t: np.ndarray = field(init=False) # array to store time
-    tInc: float = field(init=False) # increments of time
-    t0: float = field(init=False) # start of window
-    t1: float = field(init=False) # end of window
-    n : float = field(init=False) # length of timetrace
-    numpyfitobj: np.polynomial.Polynomial = field(init=False) # fit object
-    handfitdict: dict = field(init=False)
+    name: str =  field(default="None provided", init=False) # name of the ringdown
+    csv_path: str = field(repr=False) # path to csv file (full path)
+    timetrace: np.ndarray = field(init=False, repr=False) # array to store timetrace
+    croptimetrace: np.ndarray = field(init=False, repr=False) # crop of timetrace
+    logtimetrace: np.ndarray = field(init=False, repr=False) # log of timetrace (from crop of timetrace)
+    croptime: np.ndarray = field(init=False, repr=False) # window out the time
+    croptime_offset: np.ndarray = field(init=False, repr=False) # shift array to start at t=0
+    t: np.ndarray = field(init=False, repr=False) # array to store time
+    tInc: float = field(init=False, repr=False) # increments of time
+    t0: float = field(init=False, repr=False) # start of window
+    t1: float = field(init=False, repr=False) # end of window
+    n : float = field(init=False, repr=False) # length of timetrace
+    numpyfitobj: np.polynomial.Polynomial = field(init=False, repr=False) # fit object
+    handfitdict: dict = field(init=False, repr=False)
 
 
 
@@ -97,19 +97,30 @@ class RingdownCSV:
             b = self.numpyfitobj.convert().coef[1]
         return -1/b
 
-    def estimate_finesse(self, source="hand", cavity_length=2e-2):
+    def estimate_finesse(self, source="hand", cavity_length=2e-2, verbose=False):
         # assuming a cavity length of 20cm
         tau = self.get_decay_constant(source)
         tau_err_frac = np.abs(self.handfitdict['delta_A']/self.handfitdict['A'])
         l_err_frac = 500e-6/cavity_length # worse case in which the cavity length differs by one FSR
-        print(f"tau fractional uncertainty: {tau_err_frac}")
-        print(f"length fractional uncertainty: {l_err_frac}")
         sum_in_quad = lambda x: np.sqrt(np.sum(x*x))
         total_frac = sum_in_quad(np.array([tau_err_frac, l_err_frac]))
-        print(f"Total fractional uncertainty: {total_frac}")
         finesse =  np.pi*299792458*tau/cavity_length
-        print(f"Finesse: {finesse}({total_frac*finesse:.1e})")
-        return finesse
+        error = total_frac*finesse
+        if verbose:
+            print(f"tau fractional uncertainty: {tau_err_frac}")
+            print(f"length fractional uncertainty: {l_err_frac}")
+            print(f"Total fractional uncertainty: {total_frac}")
+            print(f"Finesse: {finesse}({error})")
+        return finesse, error
+
+    def compare_errors(self, scope_err=7e-4):
+        """Compare the empirical error (propagated) wit the fit error."""
+        log_err = scope_err/self.croptimetrace
+        var_est = np.sum(log_err*log_err)/self.n
+        sd_est = np.sqrt(var_est)
+        sd_fit = self.handfitdict["delta_y"]
+        return sd_est, sd_fit
+
 
     # Plotting methods
     def plot_timetrace(self, save=False):

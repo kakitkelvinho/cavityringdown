@@ -1,47 +1,121 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from analysis.ringdowncsv import RingdownCSV
 from analysis.ringdowncollection import RingdownCollection
 from analysis.loading import get_csv
 import os
 
-def main():
-    folder_path = '/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/' # define folder containing ringdowns
+plt.style.use('seaborn-v0_8-whitegrid')
+folder_path = '/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/' # define folder containing ringdowns
+scope_err = 7e-4 # error of the scope
+
+def one_angle_log_residual(angle_name: str, projection='2d', save=False, show=True):
+    ringdowncollection = RingdownCollection(os.path.join(folder_path, angle_name))
+    cmap = plt.get_cmap('tab20')
+    colors = [cmap(i / len(ringdowncollection)) for i in range(len(ringdowncollection))]
+    fig = plt.figure(figsize=(10,10))
+    if projection=='3d':
+        ax = fig.add_subplot(projection='3d')
+        for i, ringdown in enumerate(ringdowncollection):
+            a = ringdown.handfitdict["A"]
+            b = ringdown.handfitdict["B"]
+            ax.plot(ringdown.croptime_offset, ringdown.logtimetrace, zs=2*i, zdir='y', label=ringdown.name, color=colors[i], marker='.', markersize=1, ls='')
+            ax.plot(ringdown.croptime_offset, a+b*ringdown.croptime_offset, zs=2*i, zdir='y', color='black')
+        ax.legend()
+        ax.set_xlabel("Time (s)")
+        ax.set_zlabel("Log of intensity")
+        ax.set_ylabel("Trials")
+    elif projection=='2d':
+        gs = gridspec.GridSpec(2,1, height_ratios=[3,1])
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
+        for i, ringdown in enumerate(ringdowncollection):
+            ax1.plot(ringdown.croptime_offset, ringdown.logtimetrace, color=colors[i], label=ringdown.name, marker='.', markersize=1, ls='')
+            a = ringdown.handfitdict['A']
+            b = ringdown.handfitdict['B']
+            ax2.plot(ringdown.croptime_offset, ringdown.logtimetrace-a-b*ringdown.croptime_offset, marker='.', markersize=1, ls='')
+            ax2.axhline(0, ls='--', color='gray')
+        ax2.set_xlabel("Time (s)")
+        ax1.set_ylabel("Log of intensity")
+        ax2.set_ylabel("Residuals")
+        fig.suptitle(f"Ringdowns with {angle_name}")
+    else:
+        print("Please state whether projection is 2d or 3d.") 
+    if show:
+        plt.show()
+    if save:
+        plt.savefig(f"ringdowns_{angle_name}")
+
+def one_angle_finesse(angle_name:str, show=True, save=False):
+    ringdowncollection = RingdownCollection(os.path.join(folder_path, angle_name))
+    finesses = np.array([ringdown.estimate_finesse() for ringdown in ringdowncollection])
+    taus = [ringdown.get_decay_constant() for ringdown in ringdowncollection]
+    taus_error = [ringdown.handfitdict['delta_B']*(ringdown.get_decay_constant())**2 for ringdown in ringdowncollection]
+    compares = np.array([ringdown.compare_errors() for ringdown in ringdowncollection])
+    
+    plt.figure(figsize=(10,10))
+    
+    plt.subplot(221)
+    plt.errorbar(np.arange(0,len(finesses)), finesses[:,0], yerr=finesses[:,1], ls='',
+                 ecolor='black', capsize=1, capthick=1)
+    plt.title("Finesses")
+
+    plt.subplot(222)
+    plt.errorbar(np.arange(0, len(taus)), taus, yerr=taus_error, ls='',
+                 ecolor='black', capsize=1, capthick=1)
+    plt.title("Decay times")
+
+    plt.subplot(223)
+    plt.plot(compares[:,0], label="estimate")
+    plt.plot(compares[:,1], label="from fit")
+    plt.legend()
+    plt.title("Error comparison")
+
+    plt.subplot(224)
+    plt.hist(finesses[:,0], bins=30)
+    plt.title("Finesse bin")
+
+    if show:
+        plt.show()
+
+    
+
+def all_angle_plots(show=True, save=False):
+    """To plot in 3D the ringdowns, in the style shown in Dupre (2015)"""
+    # collect all the ringdowns
     angles = os.listdir(folder_path)
     angles = [angle for angle in angles if 'PA' in angle]
-
-    print(angles)
-    scope_err = 7e-4 # error of the scope
-
-    # generate a dictionary of Ringdown Collections
-    #angles_ringdown = {angle:RingdownCollection(os.path.join(folder_path, angle)) for angle in angles}
-
-    pa0 = angles[-1]
-    ringdowncollection = RingdownCollection(os.path.join(folder_path, pa0))
-    finesses = []
-    error_f = []
-    sd_ests = []
-    sd_fits =[]
+    ringdown_angles = {int(angle.split('_')[-1]): f"{folder_path}/{angle}/ringdown1.csv" for angle in angles}
+    ringdown_angles = sorted(ringdown_angles.items())
     
-    for ringdown in ringdowncollection:
-        finesse, error = ringdown.estimate_finesse()
-        finesses.append(finesse)
-        error_f.append(error)
-        sd_est, sd_fit = ringdown.compare_errors()
-        sd_ests.append(sd_est)
-        sd_fits.append(sd_fit)
+    fig = plt.figure(figsize=(10,10))
+    ax = fig.add_subplot(projection='3d')
 
-    plt.figure(figsize=(8,8))
-    plt.subplot(211)
-    plt.errorbar(np.arange(0,len(finesses)), finesses, yerr=error_f,
-                 capsize=2, ls='', marker='x')
-    plt.subplot(212)
-    plt.plot(sd_ests, label="s.d. from prop.")
-    plt.plot(sd_fits, label="error from fit")
-    plt.legend()
-    plt.show()
+    cmap =  plt.get_cmap('tab20')
+    colors = [cmap(i / len(angles)) for i in range(len(angles))]
 
-    print(ringdowncollection)
+    
+    for key, value in ringdown_angles:
+        ringdown = RingdownCSV(value)
+        ax.plot(ringdown.croptime_offset, ringdown.logtimetrace, zs=key, zdir='y', marker='.', markersize=1, ls='', color=colors[int(key/10)])
+    ax.set_xlabel("Time (s)")
+    ax.set_zlabel("Log of intensity")
+    ax.set_ylabel("PA angles (degrees)")
+    fig.suptitle(f"Ringdowns at different PA angles")
+    if show:
+        plt.show()
+    if save:
+        plt.savefig("ringdowns_at_diff_PA_angles.png")
+
+
+
+def main():
+    #one_angle_log_residual('PA_50', projection='2d')
+    #all_angle_plots()
+    one_angle_finesse('PA_50')
+
+
 
 
 

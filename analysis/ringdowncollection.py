@@ -36,6 +36,9 @@ class RingdownCollection:
         else:
             raise TypeError("Key must either be an integer (index) or a string (name, as key to dictionary).")
 
+    def __len__(self):
+        return len(self.ringdowns)
+
 
     def fit_all_ringdowns(self) -> dict:
         self.fitdicts= {ringdown.name: ringdown.fit_by_hand() for ringdown in self.ringdowns}

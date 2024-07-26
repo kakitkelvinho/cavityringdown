@@ -28,7 +28,7 @@ class RingdownCSV:
         # basic attributes
         self.name = self.csv_path.split('/')[-1].replace('.csv','')
         self.timetrace, self.tInc = get_csv(self.csv_path) 
-        self.timetrace -= np.min(self.timetrace) + 1e-12 # 1e-12 to prevent log of zero
+        self.timetrace -= np.min(self.timetrace)  # 1e-12 to prevent log of zero
         self.n = len(self.timetrace)
         self.t = np.arange(0, self.n * self.tInc, self.tInc)
         self.auto_set_window()
@@ -38,10 +38,10 @@ class RingdownCSV:
         self.croptime = self.t[self.crop_mask()]
         self.croptime_offset = self.croptime - self.croptime[0]
         self.croptimetrace = self.timetrace[self.crop_mask()]
-        self.logtimetrace = np.log(self.croptimetrace)
+        self.logtimetrace = np.log(self.croptimetrace/np.max(self.croptimetrace))
         self.fit_by_hand()
 
-    def auto_set_window(self, rolloff:float=0.5e-6, window_length:float=4e-6): 
+    def auto_set_window(self, rolloff:float=0.8e-6, window_length:float=4e-6): 
         # cropping the basic attributes or taking the log
         self.t0 = self.t[np.argmax(self.timetrace[:round(self.n/2)])] + rolloff # find the max that lies in the first half of the array
         self.t1 = self.t0 + window_length

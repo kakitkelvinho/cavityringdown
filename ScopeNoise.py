@@ -19,8 +19,6 @@ class ScopeNoise:
         self.sample_mean = np.mean(self.noisetrace)
         self.sample_sd = np.std(self.noisetrace, ddof=1)
 
-    def log_error(self):
-        pass
 
     def plot(self):
         plt.figure(figsize=(5,5));
@@ -43,7 +41,7 @@ class ScopeNoise:
 
         
 def main():
-    noise = ScopeNoise("/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/Noise/noise0.csv")
+    noise = ScopeNoise("/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/Noise/noise2.csv")
     print(noise.noisetrace)
     print("mean: ", noise.sample_mean)
     print("sd: ", noise.sample_sd)

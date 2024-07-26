@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from loading import get_csv
 
+
 @dataclass
 class RingdownCSV:
     name: str =  field(init=False) # name of the ringdown
     csv_path: str # path to csv file (full path)
     timetrace: np.ndarray = field(init=False) # array to store timetrace
-    logtimetrace: np.ndarray = field(init=False) # log of timetrace
+    croptimetrace: np.ndarray = field(init=False) # crop of timetrace
+    logtimetrace: np.ndarray = field(init=False) # log of timetrace (from crop of timetrace)
     croptime: np.ndarray = field(init=False) # window out the time
     croptime_offset: np.ndarray = field(init=False) # shift array to start at t=0
     t: np.ndarray = field(init=False) # array to store time
@@ -35,7 +37,8 @@ class RingdownCSV:
     def cropping_routine(self):
         self.croptime = self.t[self.crop_mask()]
         self.croptime_offset = self.croptime - self.croptime[0]
-        self.logtimetrace = np.log(self.timetrace[self.crop_mask()])
+        self.croptimetrace = self.timetrace[self.crop_mask()]
+        self.logtimetrace = np.log(self.croptimetrace)
         self.fit_by_hand()
 
     def auto_set_window(self, rolloff:float=0.5e-6, window_length:float=4e-6): 
@@ -97,8 +100,16 @@ class RingdownCSV:
     def estimate_finesse(self, source="hand", cavity_length=2e-2):
         # assuming a cavity length of 20cm
         tau = self.get_decay_constant(source)
-        return np.pi*3e8*tau/cavity_length
-
+        tau_err_frac = np.abs(self.handfitdict['delta_A']/self.handfitdict['A'])
+        l_err_frac = 500e-6/cavity_length # worse case in which the cavity length differs by one FSR
+        print(f"tau fractional uncertainty: {tau_err_frac}")
+        print(f"length fractional uncertainty: {l_err_frac}")
+        sum_in_quad = lambda x: np.sqrt(np.sum(x*x))
+        total_frac = sum_in_quad(np.array([tau_err_frac, l_err_frac]))
+        print(f"Total fractional uncertainty: {total_frac}")
+        finesse =  np.pi*299792458*tau/cavity_length
+        print(f"Finesse: {finesse}({total_frac*finesse:.1e})")
+        return finesse
 
     # Plotting methods
     def plot_timetrace(self, save=False):
@@ -121,11 +132,12 @@ class RingdownCSV:
         residual = fig.add_subplot(gs[1])
         logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
                      marker='.', markersize=1, ls='');
+        #logplot.errorbar(self.croptime_offset, self.logtimetrace, fmt='none', yerr=0.3, label="errors", ecolor="black", alpha=0.8)
         a = self.handfitdict['A']
         b = self.handfitdict['B']
         a_max, a_min = a+self.handfitdict['delta_A'], a-self.handfitdict['delta_A']
         b_max, b_min = b+self.handfitdict['delta_B'], b-self.handfitdict['delta_B']
-        logplot.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit")
+        logplot.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit", color='black')
         # we also plot given the errors the largest and smallest bounds for error
         logplot.plot(self.croptime_offset, a_max+b_min*self.croptime_offset, label="upper bound")
         logplot.plot(self.croptime_offset, a_min+b_max*self.croptime_offset, label="lower bound")
@@ -150,6 +162,10 @@ class RingdownCSV:
 def main():
     csv_path = '/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_100/ringdown9.csv'
     ringdown = RingdownCSV(csv_path)
+    prop_err = 7e-4/ringdown.croptimetrace
+    var = np.sum(prop_err*prop_err)/len(ringdown.croptimetrace)
+    print(f"var: {np.sqrt(var)}")
+    print(f"sd_y: {ringdown.handfitdict['delta_y']}")
     print(f"finesse estimate: {ringdown.estimate_finesse()}")
     ringdown.plot_logtimetrace()
     

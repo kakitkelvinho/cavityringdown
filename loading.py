@@ -2,7 +2,7 @@ import numpy as np
 import csv
  
 
-def get_csv_with_replace(filename: str, index:int=0):
+def get_csv(filename: str, index:int=0):
     timetrace = []
     with open(filename, mode='r', encoding='ascii') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')

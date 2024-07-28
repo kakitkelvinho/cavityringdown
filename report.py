@@ -4,6 +4,7 @@ import matplotlib.gridspec as gridspec
 from analysis.ringdowncsv import RingdownCSV
 from analysis.ringdowncollection import RingdownCollection
 from analysis.loading import get_csv
+import time
 import os
 
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -45,7 +46,7 @@ def one_angle_log_residual(angle_name: str, projection='2d', save=False, show=Tr
     if show:
         plt.show()
     if save:
-        plt.savefig(f"ringdowns_{angle_name}")
+        plt.savefig(f"./results/log_residual/ringdowns_{angle_name}.png")
 
 def one_angle_finesse(angle_name:str, show=True, save=False):
     ringdowncollection = RingdownCollection(os.path.join(folder_path, angle_name))
@@ -78,6 +79,8 @@ def one_angle_finesse(angle_name:str, show=True, save=False):
 
     if show:
         plt.show()
+    if save:
+        plt.savefig(f'./results/finesse/{angle_name}.png')
 
     
 
@@ -103,17 +106,24 @@ def all_angle_plots(show=True, save=False):
     ax.set_zlabel("Log of intensity")
     ax.set_ylabel("PA angles (degrees)")
     fig.suptitle(f"Ringdowns at different PA angles")
+    plt.tight_layout()
     if show:
         plt.show()
     if save:
-        plt.savefig("ringdowns_at_diff_PA_angles.png")
+        plt.savefig("./results/ringdowns_at_diff_PA_angles.png")
 
 
 
 def main():
-    #one_angle_log_residual('PA_50', projection='2d')
-    #all_angle_plots()
-    one_angle_finesse('PA_50')
+    tick = time.time()
+    angles = os.listdir(folder_path)
+    angles = [angle for angle in angles if 'PA' in angle]
+    for angle in angles:
+        one_angle_log_residual(angle, projection='2d', save=True, show=False)
+        one_angle_finesse(angle, show=False, save=True)
+    all_angle_plots(show=False, save=True)
+    tock = time.time()
+    print(f"Elapsed time: {(tock-tick)/60} mins")
 
 
 

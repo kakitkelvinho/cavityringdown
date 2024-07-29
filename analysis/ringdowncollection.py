@@ -41,7 +41,7 @@ class RingdownCollection:
 
 
     def fit_all_ringdowns(self) -> dict:
-        self.fitdicts= {ringdown.name: ringdown.fit_by_hand() for ringdown in self.ringdowns}
+        self.fitdicts= {ringdown.name: ringdown.fit_with_scipy() for ringdown in self.ringdowns}
         return self.fitdicts
 
     def get_decay_constants(self) -> dict:

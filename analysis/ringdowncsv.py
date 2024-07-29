@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from analysis.loading import get_csv
+from scipy.optimize import curve_fit
+from uncertainties import ufloat
 
 
 @dataclass
@@ -20,7 +22,7 @@ class RingdownCSV:
     t1: float = field(init=False, repr=False) # end of window
     n : float = field(init=False, repr=False) # length of timetrace
     numpyfitobj: np.polynomial.Polynomial = field(init=False, repr=False) # fit object
-    handfitdict: dict = field(init=False, repr=False)
+    fitdict: dict = field(init=False, repr=False)
 
 
 
@@ -39,7 +41,7 @@ class RingdownCSV:
         self.croptime_offset = self.croptime - self.croptime[0]
         self.croptimetrace = self.timetrace[self.crop_mask()]
         self.logtimetrace = np.log(self.croptimetrace/np.max(self.croptimetrace))
-        self.fit_by_hand()
+        self.fit_with_scipy()
 
     def auto_set_window(self, rolloff:float=0.8e-6, window_length:float=4e-6): 
         # cropping the basic attributes or taking the log
@@ -62,6 +64,22 @@ class RingdownCSV:
         self.numpyfitobj = fit
         return fit
 
+    def fit_with_scipy(self):
+        f = lambda x, a, b: a + b*x
+        popt, pcov = curve_fit(f, self.croptime_offset, self.logtimetrace)
+        a, b = popt[0], popt[1]
+        delta_a, delta_b = np.sqrt(pcov[0][0]), np.sqrt(pcov[1][1])
+        residual = self.logtimetrace - f(self.croptime_offset, *popt)
+        delta_y = np.sum(residual**2)/(len(self.croptime_offset)-2)
+        self.fitdict = {
+            'A': a,
+            'B': b,
+            'delta_A': delta_a,
+            'delta_B': delta_b,
+            'delta_y': delta_y
+        }
+        return self.fitdict
+
     def fit_by_hand(self):
         """Implement fitting by normal equations,
         where the model is y = A + B x"""
@@ -81,18 +99,18 @@ class RingdownCSV:
         delta_y = np.sqrt((1/(n-2))*np.sum(spread*spread))
         delta_a = delta_y * np.sqrt(sum_xsq/denominator)
         delta_b = delta_y * np.sqrt(n/denominator)
-        self.handfitdict = {
+        self.fitdict = {
             'A': a,
             'B': b,
             'delta_y': delta_y,
             'delta_A': delta_a,
             'delta_B': delta_b,
         }
-        return self.handfitdict
+        return self.fitdict
 
     def get_decay_constant(self, source="hand"):
         if source=="hand":
-            b = self.handfitdict['B']
+            b = self.fitdict['B']
         else:
             b = self.numpyfitobj.convert().coef[1]
         return -1/b
@@ -100,7 +118,7 @@ class RingdownCSV:
     def estimate_finesse(self, source="hand", cavity_length=2e-2, verbose=False):
         # assuming a cavity length of 20cm
         tau = self.get_decay_constant(source)
-        tau_err_frac = np.abs(self.handfitdict['delta_A']/self.handfitdict['A'])
+        tau_err_frac = np.abs(self.fitdict['delta_A']/self.fitdict['A'])
         l_err_frac = 500e-6/cavity_length # worse case in which the cavity length differs by one FSR
         sum_in_quad = lambda x: np.sqrt(np.sum(x*x))
         total_frac = sum_in_quad(np.array([tau_err_frac, l_err_frac]))
@@ -118,7 +136,7 @@ class RingdownCSV:
         log_err = scope_err/self.croptimetrace
         var_est = np.sum(log_err*log_err)/self.n
         sd_est = np.sqrt(var_est)
-        sd_fit = self.handfitdict["delta_y"]
+        sd_fit = self.fitdict["delta_y"]
         return sd_est, sd_fit
 
 
@@ -144,10 +162,10 @@ class RingdownCSV:
         logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
                      marker='.', markersize=1, ls='');
         #logplot.errorbar(self.croptime_offset, self.logtimetrace, fmt='none', yerr=0.3, label="errors", ecolor="black", alpha=0.8)
-        a = self.handfitdict['A']
-        b = self.handfitdict['B']
-        a_max, a_min = a+self.handfitdict['delta_A'], a-self.handfitdict['delta_A']
-        b_max, b_min = b+self.handfitdict['delta_B'], b-self.handfitdict['delta_B']
+        a = self.fitdict['A']
+        b = self.fitdict['B']
+        a_max, a_min = a+self.fitdict['delta_A'], a-self.fitdict['delta_A']
+        b_max, b_min = b+self.fitdict['delta_B'], b-self.fitdict['delta_B']
         logplot.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit", color='black')
         # we also plot given the errors the largest and smallest bounds for error
         logplot.plot(self.croptime_offset, a_max+b_min*self.croptime_offset, label="upper bound")
@@ -161,8 +179,8 @@ class RingdownCSV:
                       marker='.', markersize=1, linestyle='')
         # we also plot the empirical/sample standard deviation
         # this is to check whether our points lie within 1 s.d. of our model
-        residual.axhline(self.handfitdict['delta_y'], color='black', ls='--', label='+$\\sigma_y$')
-        residual.axhline(-self.handfitdict['delta_y'], color='black', ls='--', label='-$\\sigma_y$')
+        residual.axhline(self.fitdict['delta_y'], color='black', ls='--', label='+$\\sigma_y$')
+        residual.axhline(-self.fitdict['delta_y'], color='black', ls='--', label='-$\\sigma_y$')
         residual.set_ylabel("Residual")
         residual.set_xlabel("Time (s)")
         if save:
@@ -176,7 +194,7 @@ def main():
     prop_err = 7e-4/ringdown.croptimetrace
     var = np.sum(prop_err*prop_err)/len(ringdown.croptimetrace)
     print(f"var: {np.sqrt(var)}")
-    print(f"sd_y: {ringdown.handfitdict['delta_y']}")
+    print(f"sd_y: {ringdown.fitdict['delta_y']}")
     print(f"finesse estimate: {ringdown.estimate_finesse()}")
     ringdown.plot_logtimetrace()
     

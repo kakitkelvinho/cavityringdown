@@ -19,8 +19,8 @@ def one_angle_log_residual(angle_name: str, projection='2d', save=False, show=Tr
     if projection=='3d':
         ax = fig.add_subplot(projection='3d')
         for i, ringdown in enumerate(ringdowncollection):
-            a = ringdown.handfitdict["A"]
-            b = ringdown.handfitdict["B"]
+            a = ringdown.fitdict["A"]
+            b = ringdown.fitdict["B"]
             ax.plot(ringdown.croptime_offset, ringdown.logtimetrace, zs=2*i, zdir='y', label=ringdown.name, color=colors[i], marker='.', markersize=1, ls='')
             ax.plot(ringdown.croptime_offset, a+b*ringdown.croptime_offset, zs=2*i, zdir='y', color='black')
         ax.legend()
@@ -33,8 +33,8 @@ def one_angle_log_residual(angle_name: str, projection='2d', save=False, show=Tr
         ax2 = fig.add_subplot(gs[1], sharex=ax1)
         for i, ringdown in enumerate(ringdowncollection):
             ax1.plot(ringdown.croptime_offset, ringdown.logtimetrace, color=colors[i], label=ringdown.name, marker='.', markersize=1, ls='')
-            a = ringdown.handfitdict['A']
-            b = ringdown.handfitdict['B']
+            a = ringdown.fitdict['A']
+            b = ringdown.fitdict['B']
             ax2.plot(ringdown.croptime_offset, ringdown.logtimetrace-a-b*ringdown.croptime_offset, marker='.', markersize=1, ls='')
             ax2.axhline(0, ls='--', color='gray')
         ax2.set_xlabel("Time (s)")
@@ -53,7 +53,7 @@ def one_angle_finesse(angle_name:str, show=True, save=False):
     ringdowncollection = RingdownCollection(os.path.join(folder_path, angle_name))
     finesses = np.array([ringdown.estimate_finesse() for ringdown in ringdowncollection])
     taus = [ringdown.get_decay_constant() for ringdown in ringdowncollection]
-    taus_error = [ringdown.handfitdict['delta_B']*(ringdown.get_decay_constant())**2 for ringdown in ringdowncollection]
+    taus_error = [ringdown.fitdict['delta_B']*(ringdown.get_decay_constant())**2 for ringdown in ringdowncollection]
     compares = np.array([ringdown.compare_errors() for ringdown in ringdowncollection])
     
     plt.figure(figsize=(10,10))
@@ -131,6 +131,7 @@ def main():
     tick = time.time()
     angles = os.listdir(folder_path)
     angles = [angle for angle in angles if 'PA' in angle]
+    angle = ['PA_50']
     for angle in angles:
         one_angle_log_residual(angle, projection='2d', save=True, show=False)
         one_angle_finesse(angle, show=False, save=True)

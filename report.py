@@ -47,6 +47,7 @@ def one_angle_log_residual(angle_name: str, projection='2d', save=False, show=Tr
         plt.show()
     if save:
         plt.savefig(f"./results/log_residual/ringdowns_{angle_name}.png")
+    plt.close()
 
 def one_angle_finesse(angle_name:str, show=True, save=False):
     ringdowncollection = RingdownCollection(os.path.join(folder_path, angle_name))
@@ -60,11 +61,21 @@ def one_angle_finesse(angle_name:str, show=True, save=False):
     plt.subplot(221)
     plt.errorbar(np.arange(0,len(finesses)), finesses[:,0], yerr=finesses[:,1], ls='',
                  ecolor='black', capsize=1, capthick=1)
+    mean_finesse = np.nanmean(finesses[:,0])
+    finesse_std = np.std(finesses[:,0], ddof=1)
+    finesses_error = np.nanmedian(finesses[:,1])
+    plt.axhline(mean_finesse, color='red', ls='--', label=f"{mean_finesse:0.0f}({finesses_error:.0e})\n$\\sigma$={finesse_std:.0f}")
+    plt.legend()
     plt.title("Finesses")
 
     plt.subplot(222)
+    tau_std = np.std(taus, ddof=1)
+    tau_mean = np.nanmean(taus)
     plt.errorbar(np.arange(0, len(taus)), taus, yerr=taus_error, ls='',
                  ecolor='black', capsize=1, capthick=1)
+    plt.axhline(tau_mean, color='red', ls='--')
+    plt.axhline(tau_mean + tau_std, color='gray', ls='--')
+    plt.axhline(tau_mean-tau_std, color='gray', ls='--')
     plt.title("Decay times")
 
     plt.subplot(223)
@@ -75,12 +86,14 @@ def one_angle_finesse(angle_name:str, show=True, save=False):
 
     plt.subplot(224)
     plt.hist(finesses[:,0], bins=30)
-    plt.title("Finesse bin")
+    plt.title("Finesse Histogram")
+    plt.suptitle(f"Finesse stats at {angle_name} degrees")
 
     if show:
         plt.show()
     if save:
         plt.savefig(f'./results/finesse/{angle_name}.png')
+    plt.close()
 
     
 
@@ -111,7 +124,7 @@ def all_angle_plots(show=True, save=False):
         plt.show()
     if save:
         plt.savefig("./results/ringdowns_at_diff_PA_angles.png")
-
+    plt.close()
 
 
 def main():
@@ -123,7 +136,7 @@ def main():
         one_angle_finesse(angle, show=False, save=True)
     all_angle_plots(show=False, save=True)
     tock = time.time()
-    print(f"Elapsed time: {(tock-tick)/60} mins")
+    print(f"Elapsed time: {(tock-tick)/60:0.0f}m{((tock-tick)%1)*60:0.0f}s")
 
 
 

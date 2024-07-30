@@ -24,6 +24,7 @@ class RingdownCollection:
                 print(f"{e} for {filename}")
                 continue
             self.ringdowns.append(ringdown)
+        self.fit_all_ringdowns()
 
     def __getitem__(self, key: Union[str, int]) -> RingdownCSV:
         """For convenience and intuitiveness you can call ringdowns by indexing

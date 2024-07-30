@@ -41,9 +41,10 @@ class RingdownCSV:
         self.croptime_offset = self.croptime - self.croptime[0]
         self.croptimetrace = self.timetrace[self.crop_mask()]
         self.logtimetrace = np.log(self.croptimetrace/np.max(self.croptimetrace))
+        #self.logtimetrace = np.log(self.croptimetrace)
         self.fit_with_scipy()
 
-    def auto_set_window(self, rolloff:float=0.8e-6, window_length:float=4e-6): 
+    def auto_set_window(self, rolloff:float=1.1e-6, window_length:float=3e-6): 
         # cropping the basic attributes or taking the log
         self.t0 = self.t[np.argmax(self.timetrace[:round(self.n/2)])] + rolloff # find the max that lies in the first half of the array
         self.t1 = self.t0 + window_length
@@ -65,60 +66,30 @@ class RingdownCSV:
         return fit
 
     def fit_with_scipy(self):
-        f = lambda x, a, b: a + b*x
+        f = lambda x, m, c: m*x + c
         popt, pcov = curve_fit(f, self.croptime_offset, self.logtimetrace)
-        a, b = popt[0], popt[1]
-        delta_a, delta_b = np.sqrt(pcov[0][0]), np.sqrt(pcov[1][1])
+        m, c = popt[0], popt[1]
+        delta_m, delta_c = np.sqrt(np.diag(pcov))
         residual = self.logtimetrace - f(self.croptime_offset, *popt)
-        delta_y = np.sum(residual**2)/(len(self.croptime_offset)-2)
+        delta_y = np.sqrt(np.sum(residual**2)/(len(self.croptime_offset)-2))
         self.fitdict = {
-            'A': a,
-            'B': b,
-            'delta_A': delta_a,
-            'delta_B': delta_b,
+            'm': m,
+            'c': c,
+            'delta_m': delta_m,
+            'delta_c': delta_c,
             'delta_y': delta_y
         }
         return self.fitdict
 
-    def fit_by_hand(self):
-        """Implement fitting by normal equations,
-        where the model is y = A + B x"""
-        sum_x = np.sum(self.croptime_offset)
-        sum_xsq = np.sum(self.croptime_offset*self.croptime_offset)
-        sum_xy = np.sum(self.croptime_offset*self.logtimetrace)
-        sum_y = np.sum(self.logtimetrace)
-        n = len(self.logtimetrace)
-        denominator = n * sum_xsq - sum_x**2
+    def get_decay_constant(self):
+        m = self.fitdict['m']
+        m = ufloat(self.fitdict['m'], self.fitdict['delta_m'])
+        return -1/m
 
-        # implement the normal equations to find A and B
-        a = (sum_xsq*sum_y - sum_x*sum_xy) / denominator
-        b = (n * sum_xy - sum_x*sum_y) / denominator
-
-        # estimate standard deviations
-        spread = self.logtimetrace-a-b*self.croptime_offset
-        delta_y = np.sqrt((1/(n-2))*np.sum(spread*spread))
-        delta_a = delta_y * np.sqrt(sum_xsq/denominator)
-        delta_b = delta_y * np.sqrt(n/denominator)
-        self.fitdict = {
-            'A': a,
-            'B': b,
-            'delta_y': delta_y,
-            'delta_A': delta_a,
-            'delta_B': delta_b,
-        }
-        return self.fitdict
-
-    def get_decay_constant(self, source="hand"):
-        if source=="hand":
-            b = self.fitdict['B']
-        else:
-            b = self.numpyfitobj.convert().coef[1]
-        return -1/b
-
-    def estimate_finesse(self, source="hand", cavity_length=2e-2, verbose=False):
+    def estimate_finesse(self, cavity_length=2e-2, verbose=False):
         # assuming a cavity length of 20cm
-        tau = self.get_decay_constant(source)
-        tau_err_frac = np.abs(self.fitdict['delta_A']/self.fitdict['A'])
+        tau = self.get_decay_constant()
+        tau_err_frac = tau.s/tau.n # float; fractional uncertainty
         l_err_frac = 500e-6/cavity_length # worse case in which the cavity length differs by one FSR
         sum_in_quad = lambda x: np.sqrt(np.sum(x*x))
         total_frac = sum_in_quad(np.array([tau_err_frac, l_err_frac]))
@@ -133,8 +104,8 @@ class RingdownCSV:
 
     def compare_errors(self, scope_err=7e-4):
         """Compare the empirical error (propagated) wit the fit error."""
-        log_err = scope_err/self.croptimetrace
-        var_est = np.sum(log_err*log_err)/self.n
+        log_err = ((scope_err/self.croptimetrace)**2 + (scope_err/np.max(self.croptimetrace))**2)
+        var_est = np.sum(log_err*log_err)/len(self.croptimetrace)
         sd_est = np.sqrt(var_est)
         sd_fit = self.fitdict["delta_y"]
         return sd_est, sd_fit
@@ -147,13 +118,14 @@ class RingdownCSV:
         plt.axvline(self.t0, color='black');
         plt.axvline(self.t1, color='black');
         plt.title(f'{self.name} timetrace');
-        plt.xlabel("time (s)")
+        plt.xlabel("Time (s)")
         plt.ylabel("Voltage (V)")
         if save:
             plt.savefig('timetrace.png', dpi=300)
         plt.show();
+        plt.close();
 
-    def plot_logtimetrace(self, save=False):
+    def plot_logtimetrace(self, save=False, show=True, figname:str = "log_timetrace"):
         fig = plt.figure(figsize=(10,10))
         plt.style.use('ggplot')
         gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
@@ -162,30 +134,35 @@ class RingdownCSV:
         logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
                      marker='.', markersize=1, ls='');
         #logplot.errorbar(self.croptime_offset, self.logtimetrace, fmt='none', yerr=0.3, label="errors", ecolor="black", alpha=0.8)
-        a = self.fitdict['A']
-        b = self.fitdict['B']
-        a_max, a_min = a+self.fitdict['delta_A'], a-self.fitdict['delta_A']
-        b_max, b_min = b+self.fitdict['delta_B'], b-self.fitdict['delta_B']
-        logplot.plot(self.croptime_offset, a+b*self.croptime_offset, label="fit", color='black')
+        m = self.fitdict['m']
+        c = self.fitdict['c']
+        m_max, m_min = m + self.fitdict['delta_m'], m - self.fitdict['delta_m']
+        c_max, c_min = c + self.fitdict['delta_c'], c - self.fitdict['delta_c']
+        c_cax, c_cin = c + self.fitdict['delta_c'], c - self.fitdict['delta_c']
+        logplot.plot(self.croptime_offset, c+m*self.croptime_offset, label=f"fit {-1/m:0.2e}", color='black')
         # we also plot given the errors the largest and smallest bounds for error
-        logplot.plot(self.croptime_offset, a_max+b_min*self.croptime_offset, label="upper bound")
-        logplot.plot(self.croptime_offset, a_min+b_max*self.croptime_offset, label="lower bound")
+        logplot.plot(self.croptime_offset, c_max+m_min*self.croptime_offset, label="upper bound")
+        logplot.plot(self.croptime_offset, c_min+m_max*self.croptime_offset, label="lower bound")
         logplot.set_title(f'{self.name} log timetrace');
         logplot.legend()
         logplot.set_xlabel("Time (s)")
         logplot.set_ylabel("log of voltage (v)")
         # we next plot the residuals
-        residual.plot(self.croptime_offset, self.logtimetrace-a-b*self.croptime_offset,
+        residual.plot(self.croptime_offset, self.logtimetrace-c-m*self.croptime_offset,
                       marker='.', markersize=1, linestyle='')
         # we also plot the empirical/sample standard deviation
         # this is to check whether our points lie within 1 s.d. of our model
-        residual.axhline(self.fitdict['delta_y'], color='black', ls='--', label='+$\\sigma_y$')
-        residual.axhline(-self.fitdict['delta_y'], color='black', ls='--', label='-$\\sigma_y$')
+        residual.axhline(self.fitdict['delta_y'], color='black', ls='--', label='$+\\sigma_y$')
+        residual.axhline(-self.fitdict['delta_y'], color='black', ls='--', label='$-\\sigma_y$')
         residual.set_ylabel("Residual")
         residual.set_xlabel("Time (s)")
+        residual.legend()
         if save:
-            plt.savefig('log_timetrace.png', dpi=300)
-        plt.show();
+            plt.savefig(f'./results/log_timetrace/{figname}.png', dpi=300)
+        if show:
+            plt.show();
+        plt.close()
+
 
 
 def main():

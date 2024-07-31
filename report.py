@@ -158,6 +158,17 @@ def all_angle_plots(show=True, save=False):
     plt.close()
 
 
+def fourthirty():
+   print(f"residual sample var: {(ringdown41.fitdict['delta_y'])**2}")
+   print(f"noise var: {noise_sd**2}")
+   prop_err = (noise_sd/ringdown41.croptimetrace)**2 + (noise_sd/np.max(ringdown41.croptimetrace))**2
+   mse = np.sum(prop_err)/len(prop_err)
+   print(f"propagated error: {mse}")
+
+   ringdown41.plot_logtimetrace(save=False, show=True)
+
+ 
+
 def main():
     tick = time.time()
     pa = 'PA_50'
@@ -169,12 +180,29 @@ def main():
     ringdown8 = RingdownCSV(os.path.join(dir, 'ringdown8.csv'))
     ringdown41 = RingdownCSV(os.path.join(dir, 'ringdown41.csv'))
 
-    var_est, mse = ringdown41.compare_errors()
+    exponential_decay = np.exp(-(1/2e-6)*ringdown41.croptime_offset)
+    noise_sd = 7e-3
+    exponential_decay += np.random.normal(0,noise_sd, len(exponential_decay))
+
+    ringdown41.test_timetrace(exponential_decay, ringdown41.croptime_offset)
+    mask = ringdown41.crop_mask(2.5e-5, 3e-5)
+    noise_trace = ringdown41.timetrace[mask]
+    noise_sd = np.std(noise_trace, ddof=1)
+    noise_mean = np.mean(noise_trace)
+
+    print(f"residual sample var: {(ringdown41.fitdict['delta_y'])**2}")
+    print(f"noise var: {noise_sd**2}")
+    prop_err = (noise_sd/ringdown41.croptimetrace)**2 + (noise_sd/np.max(ringdown41.croptimetrace))**2
+    mse = np.sum(prop_err)/len(prop_err)
+    print(f"propagated error: {mse}")
+
     ringdown41.plot_logtimetrace(save=False, show=True)
+    #ringdown41.plot_timetrace()
 
-    print(var_est, mse)
 
-    #plt.figure()
+    #ringdown41.test_timetrace(exponential_decay, ringdown41.croptime_offset)
+
+        #plt.figure()
     #plt.plot(ringdown8.t, ringdown8.timetrace, label="ringdown8")
     #plt.plot(ringdown41.t, ringdown41.timetrace, label="ringdown41")
     #plt.legend()

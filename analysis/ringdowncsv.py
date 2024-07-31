@@ -23,6 +23,7 @@ class RingdownCSV:
     n : float = field(init=False, repr=False) # length of timetrace
     numpyfitobj: np.polynomial.Polynomial = field(init=False, repr=False) # fit object
     fitdict: dict = field(init=False, repr=False)
+    scope_error: float = field(default=7e-4, repr=False)
 
 
 
@@ -30,11 +31,18 @@ class RingdownCSV:
         # basic attributes
         self.name = self.csv_path.split('/')[-1].replace('.csv','')
         self.timetrace, self.tInc = get_csv(self.csv_path) 
-        self.timetrace -= np.min(self.timetrace)  # 1e-12 to prevent log of zero
+        self.timetrace -= np.min(self.timetrace) 
+        #self.timetrace -= 0.003417 # 1e-12 to prevent log of zero
         self.n = len(self.timetrace)
         self.t = np.arange(0, self.n * self.tInc, self.tInc)
         self.auto_set_window()
         self.cropping_routine()
+
+    def test_timetrace(self, timetrace: np.ndarray, t: np.ndarray):
+        self.croptimetrace = timetrace
+        self.croptime_offset = t
+        self.logtimetrace = np.log(self.croptimetrace)
+        self.fit_with_scipy()
 
     def cropping_routine(self):
         self.croptime = self.t[self.crop_mask()]
@@ -54,8 +62,12 @@ class RingdownCSV:
         self.t1 = t1
         self.cropping_routine()
 
-    def crop_mask(self):
-        mask = np.logical_and(self.t >= self.t0, self.t <= self.t1)
+    def crop_mask(self, t0=None, t1=None):
+        if t0 == None:
+            t0 = self.t0
+        if t1 == None:
+            t1 = self.t1
+        mask = np.logical_and(self.t >= t0, self.t <= t1)
         return mask
 
    
@@ -78,6 +90,34 @@ class RingdownCSV:
             'delta_m': delta_m,
             'delta_c': delta_c,
             'delta_y': delta_y
+        }
+        return self.fitdict
+    
+    def fit_by_hand(self):
+        """Implement fitting by normal equations,
+        where the model is y = A + B x"""
+        sum_x = np.sum(self.croptime_offset)
+        sum_xsq = np.sum(self.croptime_offset*self.croptime_offset)
+        sum_xy = np.sum(self.croptime_offset*self.logtimetrace)
+        sum_y = np.sum(self.logtimetrace)
+        n = len(self.logtimetrace)
+        denominator = n * sum_xsq - sum_x**2
+
+        # implement the normal equations to find A and B
+        a = (sum_xsq*sum_y - sum_x*sum_xy) / denominator
+        b = (n * sum_xy - sum_x*sum_y) / denominator
+
+        # estimate standard deviations
+        spread = self.logtimetrace-a-b*self.croptime_offset
+        delta_y = np.sqrt((1/(n-2))*np.sum(spread*spread))
+        delta_a = delta_y * np.sqrt(sum_xsq/denominator)
+        delta_b = delta_y * np.sqrt(n/denominator)
+        self.handfitdict = {
+            'c': a,
+            'm': b,
+            'delta_y': delta_y,
+            'delta_c': delta_a,
+            'delta_m': delta_b,
         }
         return self.fitdict
 
@@ -128,9 +168,10 @@ class RingdownCSV:
     def plot_logtimetrace(self, save=False, show=True, figname:str = "log_timetrace"):
         fig = plt.figure(figsize=(10,10))
         plt.style.use('ggplot')
-        gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+        gs = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 1])
         logplot =  fig.add_subplot(gs[0])
         residual = fig.add_subplot(gs[1])
+        error = fig.add_subplot(gs[2])
         logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
                      marker='.', markersize=1, ls='');
         #logplot.errorbar(self.croptime_offset, self.logtimetrace, fmt='none', yerr=0.3, label="errors", ecolor="black", alpha=0.8)
@@ -138,7 +179,6 @@ class RingdownCSV:
         c = self.fitdict['c']
         m_max, m_min = m + self.fitdict['delta_m'], m - self.fitdict['delta_m']
         c_max, c_min = c + self.fitdict['delta_c'], c - self.fitdict['delta_c']
-        c_cax, c_cin = c + self.fitdict['delta_c'], c - self.fitdict['delta_c']
         logplot.plot(self.croptime_offset, c+m*self.croptime_offset, label=f"fit {-1/m:0.2e}", color='black')
         # we also plot given the errors the largest and smallest bounds for error
         logplot.plot(self.croptime_offset, c_max+m_min*self.croptime_offset, label="upper bound")
@@ -157,10 +197,14 @@ class RingdownCSV:
         residual.set_ylabel("Residual")
         residual.set_xlabel("Time (s)")
         residual.legend()
+        # error plot
+        error.plot(self.croptime_offset, np.sqrt(self.scope_error/self.croptimetrace)**2 + (self.scope_error/np.max(self.croptimetrace))**2)
         if save:
             plt.savefig(f'./results/log_timetrace/{figname}.png', dpi=300)
         if show:
             plt.show();
+        # generate an array for propagated uncertainty
+
         plt.close()
 
 

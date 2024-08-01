@@ -158,66 +158,20 @@ def all_angle_plots(show=True, save=False):
     plt.close()
 
 
-def fourthirty():
-   print(f"residual sample var: {(ringdown41.fitdict['delta_y'])**2}")
-   print(f"noise var: {noise_sd**2}")
-   prop_err = (noise_sd/ringdown41.croptimetrace)**2 + (noise_sd/np.max(ringdown41.croptimetrace))**2
-   mse = np.sum(prop_err)/len(prop_err)
-   print(f"propagated error: {mse}")
-
-   ringdown41.plot_logtimetrace(save=False, show=True)
-
- 
-
 def main():
     tick = time.time()
     pa = 'PA_50'
     #one_angle_taus(pa, show=True, save=True)
-    
-
+    plt.close('all')
     #one_angle_log_residual(pa, projection='2d', save=True)
     dir = os.path.join(folder_path, pa)
-    ringdown8 = RingdownCSV(os.path.join(dir, 'ringdown8.csv'))
     ringdown41 = RingdownCSV(os.path.join(dir, 'ringdown41.csv'))
+    mask = ringdown41.crop_mask(t0=2.5e-5, t1=3e-5)
+    noise = ringdown41.timetrace[mask]
+    sd = np.std(noise, ddof=1)
+    print(sd)
 
-    exponential_decay = np.exp(-(1/2e-6)*ringdown41.croptime_offset)
-    noise_sd = 7e-3
-    exponential_decay += np.random.normal(0,noise_sd, len(exponential_decay))
-
-    ringdown41.test_timetrace(exponential_decay, ringdown41.croptime_offset)
-    mask = ringdown41.crop_mask(2.5e-5, 3e-5)
-    noise_trace = ringdown41.timetrace[mask]
-    noise_sd = np.std(noise_trace, ddof=1)
-    noise_mean = np.mean(noise_trace)
-
-    print(f"residual sample var: {(ringdown41.fitdict['delta_y'])**2}")
-    print(f"noise var: {noise_sd**2}")
-    prop_err = (noise_sd/ringdown41.croptimetrace)**2 + (noise_sd/np.max(ringdown41.croptimetrace))**2
-    mse = np.sum(prop_err)/len(prop_err)
-    print(f"propagated error: {mse}")
-
-    ringdown41.plot_logtimetrace(save=False, show=True)
-    #ringdown41.plot_timetrace()
-
-
-    #ringdown41.test_timetrace(exponential_decay, ringdown41.croptime_offset)
-
-        #plt.figure()
-    #plt.plot(ringdown8.t, ringdown8.timetrace, label="ringdown8")
-    #plt.plot(ringdown41.t, ringdown41.timetrace, label="ringdown41")
-    #plt.legend()
-    #plt.show()
-    #plt.close()
-    #for csvfile in tqdm(os.listdir(dir)):
-    #    ringdown = RingdownCSV(os.path.join(dir,csvfile))
-    #    ringdown.plot_logtimetrace(save=True, show=False, figname=csvfile)
-   # angles = os.listdir(folder_path)
-   # angles = [angle for angle in angles if 'PA' in angle]
-   # angles = ['PA_50']
-   # for angle in angles:
-   #     one_angle_log_residual(angle, projection='2d', save=True, show=False)
-   #     one_angle_finesse(angle, show=False, save=True)
-   # all_angle_plots(show=False, save=True)
+    ringdown41.fit_log_offset(plot=True)
     tock = time.time()
     print(f"Elapsed time: {(tock-tick)/60:0.0f}m{((tock-tick)%1)*60:0.0f}s")
 

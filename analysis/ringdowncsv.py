@@ -23,7 +23,7 @@ class RingdownCSV:
     n : float = field(init=False, repr=False) # length of timetrace
     numpyfitobj: np.polynomial.Polynomial = field(init=False, repr=False) # fit object
     fitdict: dict = field(init=False, repr=False)
-    scope_error: float = field(default=7e-4, repr=False)
+    scope_error: float = field(default=8.34e-4, repr=False)
 
 
 
@@ -38,16 +38,20 @@ class RingdownCSV:
         self.auto_set_window()
         self.cropping_routine()
 
-    def test_timetrace(self, timetrace: np.ndarray, t: np.ndarray):
+    def test_timetrace(self, timetrace: np.ndarray, t: np.ndarray, noise: float):
         self.croptimetrace = timetrace
         self.croptime_offset = t
         self.logtimetrace = np.log(self.croptimetrace)
+        self.scope_error = noise
         self.fit_with_scipy()
 
     def cropping_routine(self):
         self.croptime = self.t[self.crop_mask()]
         self.croptime_offset = self.croptime - self.croptime[0]
+        latermask = self.crop_mask(self.t0+2e-6, self.t0+3e-6)
         self.croptimetrace = self.timetrace[self.crop_mask()]
+        noise = self.timetrace[latermask]
+        noise_level = np.median(noise)
         self.logtimetrace = np.log(self.croptimetrace/np.max(self.croptimetrace))
         #self.logtimetrace = np.log(self.croptimetrace)
         self.fit_with_scipy()
@@ -76,6 +80,96 @@ class RingdownCSV:
         fit = np.polynomial.Polynomial.fit(self.croptime_offset, self.logtimetrace, deg=1)
         self.numpyfitobj = fit
         return fit
+
+
+    def fit_log_offset(self, plot=True, test=False):
+        t = self.croptime_offset
+        if test:
+            a_orig, tau_orig, offset_orig = [1, 2.5e-6, 0.5]
+            trace = a_orig*np.exp(-(1/tau_orig)*t)+offset_orig
+            noise_sd = 0.09
+            trace += np.random.normal(0, noise_sd, len(trace))
+        else:
+            trace = self.croptimetrace 
+            max_croptimetrace = np.max(self.croptimetrace)
+            trace /= max_croptimetrace
+            noise_sd = self.scope_error
+
+        trace = np.log(trace)
+        f = lambda t, tau, a, offset: np.log(a*np.exp(-t/tau)+offset)        
+        popt, pcov = curve_fit(f, t, trace, p0=[2e-6, 0.08, 0])
+        tau, a, offset = popt
+        delta_tau, delta_a, delta_offset = np.sqrt(np.diag(pcov))
+        residual = trace - f(t, *popt)
+        mse = np.sum(residual**2)/(len(trace)-3)
+        prop_err_sq = (noise_sd/np.exp(trace))**2 + (noise_sd/max_croptimetrace)**2
+        var_est = np.mean(prop_err_sq)
+        print(f"MSE: {mse}, Estimator of var: {var_est}")
+        print(f"parameters: tau: {tau}, a: {a}, offset: {offset}")
+        print(f"error: tau: {delta_tau}, a: {delta_a}, offset: {delta_offset}")
+        if plot:
+            plt.close('all')
+            fig = plt.figure(figsize=(10,10))
+            gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1,])
+            ax1 = fig.add_subplot(gs[0]) 
+            ax2 = fig.add_subplot(gs[1])
+            ax1.plot(t, trace, label="time trace", marker=1, ls='', color='red')
+            ax1.plot(t, f(t, *popt), label="fit")
+            ax1.set_xlabel("t (s)")
+            ax1.set_ylabel("Voltage (V)")
+            ax1.legend()
+            ax2.plot(t, residual, ls='', label="residual")
+            ax2.axhline(noise_sd, color='gray', ls='--')
+            ax2.axhline(-noise_sd, color='gray', ls='--')
+            ax2.set_ylabel('Residual')
+            ax2.set_xlabel('t (s)')
+            ax2.legend()
+            fig.tight_layout()
+            plt.savefig('./results/test.png') 
+            plt.show()
+
+
+
+
+    def fit_exponential_curve(self, plot=True, test=False):
+        t = self.croptime_offset
+        if test:
+            a_orig, tau_orig, offset_orig = [0.09, 2e-6, -0.001]
+            trace = a_orig*np.exp(-(1/tau_orig)*t)+offset_orig
+            noise_sd = 0
+            trace += np.random.normal(0, noise_sd, len(trace))
+        else:
+            trace = self.croptimetrace
+            noise_sd = self.scope_error
+        f = lambda t, tau, a, offset: a*np.exp(-t/tau) + offset
+        popt, pcov = curve_fit(f, t, trace, p0=[2e-6, 0.08, 0])
+        tau, a, offset = popt
+        delta_tau, delta_a, delta_offset = np.sqrt(np.diag(pcov))
+        residual = trace - f(t, *popt)
+        mse = np.sum(residual**2)/(len(trace)-3)
+        print(f"MSE: {mse}")
+        print(f"parameters: tau: {tau}, a: {a}, offset: {offset}")
+        print(f"error: tau: {delta_tau}, a: {delta_a}, offset: {delta_offset}")
+        if plot:
+            plt.close('all')
+            fig = plt.figure(figsize=(10,10))
+            gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1,])
+            ax1 = fig.add_subplot(gs[0]) 
+            ax2 = fig.add_subplot(gs[1])
+            ax1.plot(t, trace, label="time trace", marker=1, ls='', color='red')
+            ax1.plot(t, f(t, *popt), label="fit")
+            ax1.set_xlabel("t (s)")
+            ax1.set_ylabel("Voltage (V)")
+            
+            ax2.plot(t, residual, ls='', color='green', label="residual")
+            #ax2.axhline(noise_sd**2,color='gray', ls='--', label="noise var")
+            ax2.axhline(noise_sd, color='gray', ls='--')
+            ax2.axhline(-noise_sd, color='gray', ls='--')
+            ax2.set_ylabel('Residual')
+            ax2.set_xlabel('t (s)')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig('./results/test.png') 
 
     def fit_with_scipy(self):
         f = lambda x, m, c: m*x + c
@@ -168,10 +262,10 @@ class RingdownCSV:
     def plot_logtimetrace(self, save=False, show=True, figname:str = "log_timetrace"):
         fig = plt.figure(figsize=(10,10))
         plt.style.use('ggplot')
-        gs = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 1])
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1,])
         logplot =  fig.add_subplot(gs[0])
         residual = fig.add_subplot(gs[1])
-        error = fig.add_subplot(gs[2])
+        #error = fig.add_subplot(gs[2])
         logplot.plot(self.croptime_offset, self.logtimetrace, label='log of timetrace',
                      marker='.', markersize=1, ls='');
         #logplot.errorbar(self.croptime_offset, self.logtimetrace, fmt='none', yerr=0.3, label="errors", ecolor="black", alpha=0.8)
@@ -188,17 +282,19 @@ class RingdownCSV:
         logplot.set_xlabel("Time (s)")
         logplot.set_ylabel("log of voltage (v)")
         # we next plot the residuals
-        residual.plot(self.croptime_offset, self.logtimetrace-c-m*self.croptime_offset,
-                      marker='.', markersize=1, linestyle='')
+        residuals = self.logtimetrace-c-m*self.croptime_offset
+        residual.plot(self.croptime_offset, residuals**2,
+                      marker='.', markersize=1, linestyle='', color='tab:orange', label='residual squared')
+        residual.plot(self.croptime_offset, (self.scope_error/self.croptimetrace)**2 + (self.scope_error/np.max(self.croptimetrace))**2, color='tab:green', marker='.', markersize=1, ls='', label='err. var')
         # we also plot the empirical/sample standard deviation
         # this is to check whether our points lie within 1 s.d. of our model
-        residual.axhline(self.fitdict['delta_y'], color='black', ls='--', label='$+\\sigma_y$')
-        residual.axhline(-self.fitdict['delta_y'], color='black', ls='--', label='$-\\sigma_y$')
+        residual.axhline(self.fitdict['delta_y']**2, color='black', ls='--', label='$+\\sigma_y^2$')
+        #residual.axhline(-self.fitdict['delta_y'], color='black', ls='--', label='$-\\sigma_y$')
         residual.set_ylabel("Residual")
         residual.set_xlabel("Time (s)")
         residual.legend()
         # error plot
-        error.plot(self.croptime_offset, np.sqrt(self.scope_error/self.croptimetrace)**2 + (self.scope_error/np.max(self.croptimetrace))**2)
+        #error.plot(self.croptime_offset, np.sqrt(self.scope_error/self.croptimetrace)**2 + (self.scope_error/np.max(self.croptimetrace))**2)
         if save:
             plt.savefig(f'./results/log_timetrace/{figname}.png', dpi=300)
         if show:

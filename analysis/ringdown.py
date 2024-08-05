@@ -36,6 +36,9 @@ class Ringdown:
             t0 = self.t0
         if window == None:
             window = self.window
+        else:
+            self.t0 = t0
+            self.window = window
 
         self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
@@ -57,6 +60,9 @@ class Ringdown:
         return np.log(a*np.exp(-t/tau) + c)
 
     def create_logtimetrace(self, t0, window, offset=1e-12):
+        '''Generates log of timetrace, 
+        returns cropped time, a mask, 
+        the cropped and normalized timetrace and log of timetrace'''
         mask = np.logical_and(self.t >= t0, self.t <= t0+window)
         timetrace = self.timetrace[mask] - np.min(self.timetrace) + offset
         cropnormtimetrace = timetrace / np.max(timetrace)
@@ -94,51 +100,66 @@ class Ringdown:
         |---------------|
         '''
         delta_tau = np.sqrt(pcov[1][1])
+        tau_u = ufloat(popt[1], delta_tau)
         fig = plt.figure(figsize=(15,8))
-        fig.suptitle("Ringdowns and Fits")
-        gs = fig.add_gridspec(2, 2, width_ratios=(1,1), height_ratios=(1,1))
+        fig.suptitle("Ringdowns and Fits", fontsize=20)
+        subfigs = fig.subfigures(1,2, wspace=0.01)
+        left = subfigs[0]
+        #gs = fig.add_gridspec(2, 2, width_ratios=(1,1), height_ratios=(1,1))
 
-        ax1 = fig.add_subplot(gs[:,0])
-        ax1.plot(self.t/1e-6, self.timetrace)
-        ax1.axvline(self.t0/1e-6, color='black')
-        ax1.axvline((self.t0+self.window)/1e-6, color='black')
+
+        ax1 = left.add_subplot(111)
+        ax1.plot(self.t/1e-6, self.timetrace, color='tab:blue', marker='.', markersize=1, ls='none', label='raw timetrace')
+        ax1.axvline(self.t0/1e-6, color='black', ls='--', label='start time')
+        ax1.axvline((self.t0+self.window)/1e-6, ls='--', color='black', label='end time')
+        ax1.legend(markerscale=10)
         ax1.set_xlabel("Time ($\\mu$s)")
         ax1.set_ylabel("Intensity (V)")
         ax1.set_title("Recorded Timetrace")
         
-        right_gs = gs[:, 1].subgridspec(4, 1, height_ratios=[3,1,3,1])
+        right = subfigs[1].subfigures(2, 1, height_ratios=[1,1])
+        righttop = right[0].add_gridspec(2, 1, height_ratios=[3,1])
+        rightbottom = right[1].add_gridspec(2,1, height_ratios=[3,1])
 
-        ax23 = fig.add_subfigure(gs[0,1])
-        ax23.subplots_adjust(hspace=0)
 
-        ax2 = ax23.add_subplot(right_gs[0,0])
+
+        right[0].subplots_adjust(hspace=0)
+        ax2 = right[0].add_subplot(righttop[0])
         ax2.set_title("Log of intensity")
-        ax2.plot(self.t_crop/1e-6, self.logtimetrace, label="log", markersize=1, alpha=0.4)
-        ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: {popt[1]:0.2e} ({delta_tau:0.1e})s")
+        ax2.plot(self.t_crop/1e-6, self.logtimetrace, label="log", marker='.', ls='none', markersize=1, alpha=0.6, color='tab:red')
+        ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: ${tau_u:.2eL}$ s", color='darkmagenta')
         ax2.tick_params(labelbottom=False)
         ax2.set_ylabel("Intensity (V)")
-        ax2.legend()
+        ax2.legend(markerscale=10)
 
-        ax3 = ax23.add_subplot(right_gs[1,0], sharex=ax2)
-        ax3.plot(self.t_crop/1e-6, self.logtimetrace - self.fit_func(self.t_crop, *popt))
+        ax3 = right[0].add_subplot(righttop[1], sharex=ax2)
+        residual = self.fit_func(self.t_crop, *popt) - self.logtimetrace
+        mean_res = np.mean(residual)
+        std_res = np.std(residual, ddof=1)
+        ax3.plot(self.t_crop/1e-6, residual, marker='.', markersize=1, ls='', color='tab:red')
+        ax3.axhspan(mean_res + std_res, mean_res - std_res, fill=0, ls='--', color='black', label=f"$\\sigma:$ {std_res:.1e}")
+        ax3.legend(frameon=True, facecolor='white', loc='lower left', markerscale=10)
         ax3.set_ylabel("Residual")
         ax3.set_xlabel("Time ($\\mu$s)")
         
-        ax45 = fig.add_subfigure(gs[1,1])
-        ax45.subplots_adjust(hspace=0)
-
-        ax4 = ax45.add_subplot(right_gs[2,0])
-        ax4.set_title("Cropped and Normalized Timetrace")
-        ax4.plot(self.t_crop, self.cropnormtimetrace, markersize=1, alpha=0.4, label="cropped and normalized")
-        ax4.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2], label="fit w/ above params")
+        right[1].subplots_adjust(hspace=0)
+        ax4 = right[1].add_subplot(rightbottom[0])
+        ax4.set_title("Cropped and Normalized Intensity")
+        ax4.plot(self.t_crop/1e-6, self.cropnormtimetrace, marker='.', ls='', markersize=1, alpha=0.6, label="cropped and normalized", color='tab:green')
+        ax4.plot(self.t_crop/1e-6, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2], label="fit w/ above params", color='darkmagenta')
         ax4.tick_params(labelbottom=False)
         ax4.set_ylabel("Intensity (V)")
         ax4.tick_params(labelbottom=False)
-        ax4.legend()
+        ax4.legend(markerscale=10)
 
 
-        ax5 = ax45.add_subplot(right_gs[3,0], sharex=ax4)
-        ax5.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2] - self.cropnormtimetrace)
+        ax5 = right[1].add_subplot(rightbottom[1], sharex=ax4)
+        residual = self.cropnormtimetrace - (popt[0]*np.exp(-self.t_crop/popt[1])+popt[2])
+        mean_res = np.mean(residual)
+        std_res = np.std(residual, ddof=1)
+        ax5.plot(self.t_crop/1e-6, residual, marker='.', ls='', markersize=1, color='tab:green')
+        ax5.axhspan(mean_res + std_res, mean_res - std_res, fill=0, ls='--', color='black', label=f"$\\sigma:$ {std_res:.1e}")
+        ax5.legend(frameon=True, facecolor='white', loc='lower left', markerscale=10)
         ax5.set_ylabel("Residual")
         ax5.set_xlabel("Time ($\\mu$s)")
         
@@ -161,14 +182,16 @@ class Ringdown:
 def main():
     t = np.arange(0, 2e-6, 2.5e-10)
     a, tau, c = [0.4, 1.8e-6, 0.03]
-    trace = a*np.exp(-t/tau) - c
+    trace_og = a*np.exp(-t/tau) - c
     noise_sd = a/100
-    noise = np.random.normal(0, noise_sd, len(trace))
-    trace += noise
+    noise = np.random.normal(0, noise_sd, len(trace_og))
+    trace = trace_og + noise
     ringdown = Ringdown(timetrace=trace, t=t)
     print(f"injected noise: {noise_sd}")
+    print(f"actual noise sd: {np.std(noise, ddof=1)}")
+    print(f"denoise signal and recalculate:\n mean: {np.mean(trace-trace_og)}, std: {np.std(trace - trace_og, ddof=1)}")
 
-    popt, pcov = ringdown.fit()
+    popt, pcov = ringdown.fit(window=2e-6)
     delta_a, delta_tau, delta_c = np.sqrt(np.diag(pcov))
 
 

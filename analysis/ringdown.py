@@ -16,6 +16,11 @@ class Ringdown:
     t0: float = field(default=0., init=False, repr=False) # start of window
     window: float = field(default=1.5e-6, init=False, repr=False) # size of window
 
+    t_crop: np.ndarray = field(repr=False, init=False)
+    mask: np.ndarray = field(repr=False, init=False)
+    cropnormtimetrace: np.ndarray = field(repr=False, init=False)
+    logtimetrace: np.ndarray = field(repr=False, init=False)
+
     def __post_init__(self):
         # ensure that input is numpy array
         pass
@@ -32,24 +37,20 @@ class Ringdown:
         if window == None:
             window = self.window
 
-        t_crop, logtimetrace = self.create_logtimetrace(t0, window)
+        self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
         # fit timetrace
-        popt, pcov = curve_fit(self.fit_func, xdata=t_crop, ydata=logtimetrace, p0=p0)
+        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0)
         
         # get residuals
-        residuals = logtimetrace - self.fit_func(t_crop, *popt)
+        residuals = self.logtimetrace - self.fit_func(self.t_crop, *popt)
         # calculate rmse
-        rmse = np.sqrt(np.sum(residuals*residuals)/(len(logtimetrace)-3))
+        rmse = np.sqrt(np.sum(residuals*residuals)/(len(self.logtimetrace)-3))
         print(f"rmse: {rmse}")
 
         ### EDIT LATER
-
-
-
         if plot:
-            self.plot_fit(logtimetrace, t_crop, popt, pcov)
-
+            self.plot_fit(popt, pcov)
         return popt, pcov
 
     def fit_func(self, t, a, tau, c):
@@ -58,56 +59,103 @@ class Ringdown:
     def create_logtimetrace(self, t0, window, offset=1e-12):
         mask = np.logical_and(self.t >= t0, self.t <= t0+window)
         timetrace = self.timetrace[mask] - np.min(self.timetrace) + offset
-        normalized_timetrace = timetrace / np.max(timetrace)
-        logtimetrace = np.log(normalized_timetrace)
+        cropnormtimetrace = timetrace / np.max(timetrace)
+        logtimetrace = np.log(cropnormtimetrace)
         t_crop = self.t[mask]
         t_crop -= t_crop[0] # to start at t=0
-        return t_crop, logtimetrace
+        return t_crop, mask, cropnormtimetrace, logtimetrace
 
-
-
-    def propagate_uncertainties(self, noise=0., t0=None, window=None):
+    def exp_residual(self, t0=None, window=None, p0=[0.2, 1e-6, 0.]):
         if t0 == None:
             t0 = self.t0
         if window == None:
             window = self.window
-
-        min_val = ufloat(np.min(self.timetrace), noise)
-        timetrace_u = [ufloat(value, noise) - min_val for value in self.timetrace]
-        timetrace_u = np.array(timetrace_u)
-        timetrace_u = timetrace_u[np.logical_and(self.t >= t0, self.t <= t0+window)]
-        logtimetrace_u = [log(value/max(timetrace_u)) for value in timetrace_u]
-        propagated_error = np.array([value.s for value in logtimetrace_u])
-        var = np.mean(propagated_error*2)
-        return np.sqrt(var)
-        
+        popt, _ = self.fit(t0, window, p0, plot=False)
+        residual_from_exp = self.cropnormtimetrace - (popt[0]*np.exp(-self.t_crop/popt[1]) - popt[1])
+        return np.std(residual_from_exp, ddof = 1)
         
 
-    def plot_fit(self, logtimetrace, t_crop, popt, pcov):
+    def plot_fit(self, popt, pcov):
+        '''
+        Plots the ringdown (1), log ringdown + fit (2) and residuals (3), 
+        and the cropped ringdown + fit (4) and residual (5)
+        |---------------|
+        |       |       |
+        |       |   2.  |        
+        |       |       |
+        |       |-------|
+        |       |   3.  |
+        |   1.  |-------|
+        |       |       |
+        |       |   4.  |
+        |       |       |
+        |       |-------|
+        |       |   5.  |
+        |---------------|
+        '''
         delta_tau = np.sqrt(pcov[1][1])
-        plt.figure(figsize=(15,8))
-        plt.subplot(121)
-        plt.plot(self.t, self.timetrace)
-        plt.title("Timetrace")
-        plt.ylabel("Intensity (V)")
-        plt.xlabel("Time (s)")
-        plt.subplot(122)
-        plt.plot(t_crop, logtimetrace, '.', ls='', color='red', label="log timetrace")
-        plt.plot(t_crop, self.fit_func(t_crop, *popt), color='black', label=f"Fit: $\\tau =${popt[1]:.2e}({delta_tau:.1e})s")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Log")
-        plt.legend()
-        plt.title("Log time trace")
+        fig = plt.figure(figsize=(15,8),)
+        fig.suptitle("Ringdowns and Fits")
+        gs = fig.add_gridspec(4, 2, width_ratios=(1,1), height_ratios=(3,1,3,1))
+
+        ax1 = fig.add_subplot(gs[:,0])
+        ax1.plot(self.t/1e-6, self.timetrace)
+        ax1.axvline(self.t0/1e-6, color='black')
+        ax1.axvline((self.t0+self.window)/1e-6, color='black')
+        ax1.set_xlabel("Time ($\\mu$s)")
+        ax1.set_ylabel("Intensity (V)")
+        ax1.set_title("Recorded Timetrace")
+        
+
+        ax2 = fig.add_subplot(gs[0,1])
+        ax2.set_title("Log of intensity")
+        ax2.plot(self.t_crop/1e-6, self.logtimetrace, label="log", markersize=1, alpha=0.4)
+        ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: {popt[1]:0.2e} ({delta_tau:0.1e})s")
+        ax2.tick_params(labelbottom=False)
+        ax2.set_ylabel("Intensity (V)")
+
+        ax3 = fig.add_subplot(gs[1,1], sharex=ax2)
+        ax3.plot(self.t_crop/1e-6, self.logtimetrace - self.fit_func(self.t_crop, *popt))
+        ax3.set_ylabel("Residual")
+        ax3.set_xlabel("Time ($\\mu$s)")
+        
+
+        ax4 = fig.add_subplot(gs[2,1])
+        ax4.plot(self.t_crop, self.cropnormtimetrace, markersize=1, alpha=0.4, label="cropped and normalized")
+        ax4.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2], label="fit w/ above params")
+        ax4.tick_params(labelbottom=False)
+        ax4.set_ylabel("Intensity (V)")
+        ax4.tick_params(labelbottom=False)
+
+
+        ax5 = fig.add_subplot(gs[3,1], sharex=ax4)
+        ax5.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2] - self.cropnormtimetrace)
+        ax5.set_ylabel("Residual")
+        ax5.set_xlabel("Time ($\\mu$s)")
+
         plt.show()
 
 
+#
+#        plt.subplot(121)
+#        plt.plot(self.t, self.timetrace)
+#        plt.subplot(222)
+#        plt.plot(t_crop, logtimetrace)
+#        plt.plot(t_crop, self.fit_func(t_crop, *popt))
+#        plt.subplot(224)
+#        plt.plot(t_crop, self.cropnormtimetrace)
+#        plt.plot(t_crop, popt[0]*np.exp(-t_crop/popt[1])+popt[2])
+#        plt.legend()
+#        plt.tight_layout()
+#        plt.show()
+        
 def main():
     t = np.arange(0, 2e-6, 2.5e-10)
     a, tau, c = [0.4, 1.8e-6, 0.03]
     trace = a*np.exp(-t/tau) - c
-    noise_sd = a/5
-    trace += np.random.normal(0, noise_sd, len(trace))
-
+    noise_sd = a/100
+    noise = np.random.normal(0, noise_sd, len(trace))
+    trace += noise
     ringdown = Ringdown(timetrace=trace, t=t)
     print(f"injected noise: {noise_sd}")
 

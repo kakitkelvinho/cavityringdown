@@ -94,9 +94,9 @@ class Ringdown:
         |---------------|
         '''
         delta_tau = np.sqrt(pcov[1][1])
-        fig = plt.figure(figsize=(15,8),)
+        fig = plt.figure(figsize=(15,8))
         fig.suptitle("Ringdowns and Fits")
-        gs = fig.add_gridspec(4, 2, width_ratios=(1,1), height_ratios=(3,1,3,1))
+        gs = fig.add_gridspec(2, 2, width_ratios=(1,1), height_ratios=(1,1))
 
         ax1 = fig.add_subplot(gs[:,0])
         ax1.plot(self.t/1e-6, self.timetrace)
@@ -106,33 +106,42 @@ class Ringdown:
         ax1.set_ylabel("Intensity (V)")
         ax1.set_title("Recorded Timetrace")
         
+        right_gs = gs[:, 1].subgridspec(4, 1, height_ratios=[3,1,3,1])
 
-        ax2 = fig.add_subplot(gs[0,1])
+        ax23 = fig.add_subfigure(gs[0,1])
+        ax23.subplots_adjust(hspace=0)
+
+        ax2 = ax23.add_subplot(right_gs[0,0])
         ax2.set_title("Log of intensity")
         ax2.plot(self.t_crop/1e-6, self.logtimetrace, label="log", markersize=1, alpha=0.4)
         ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: {popt[1]:0.2e} ({delta_tau:0.1e})s")
         ax2.tick_params(labelbottom=False)
         ax2.set_ylabel("Intensity (V)")
+        ax2.legend()
 
-        ax3 = fig.add_subplot(gs[1,1], sharex=ax2)
+        ax3 = ax23.add_subplot(right_gs[1,0], sharex=ax2)
         ax3.plot(self.t_crop/1e-6, self.logtimetrace - self.fit_func(self.t_crop, *popt))
         ax3.set_ylabel("Residual")
         ax3.set_xlabel("Time ($\\mu$s)")
         
+        ax45 = fig.add_subfigure(gs[1,1])
+        ax45.subplots_adjust(hspace=0)
 
-        ax4 = fig.add_subplot(gs[2,1])
+        ax4 = ax45.add_subplot(right_gs[2,0])
+        ax4.set_title("Cropped and Normalized Timetrace")
         ax4.plot(self.t_crop, self.cropnormtimetrace, markersize=1, alpha=0.4, label="cropped and normalized")
         ax4.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2], label="fit w/ above params")
         ax4.tick_params(labelbottom=False)
         ax4.set_ylabel("Intensity (V)")
         ax4.tick_params(labelbottom=False)
+        ax4.legend()
 
 
-        ax5 = fig.add_subplot(gs[3,1], sharex=ax4)
+        ax5 = ax45.add_subplot(right_gs[3,0], sharex=ax4)
         ax5.plot(self.t_crop, popt[0]*np.exp(-self.t_crop/popt[1])+popt[2] - self.cropnormtimetrace)
         ax5.set_ylabel("Residual")
         ax5.set_xlabel("Time ($\\mu$s)")
-
+        
         plt.show()
 
 

@@ -171,3 +171,16 @@ class Ringdown:
         ax5.set_xlabel("Time ($\\mu$s)")
         
         plt.show()
+
+
+def generate_test_timetrace(a, tau, c, noise_sd, tEnd=2e-6, tInc=2.5e-10):
+    '''Generates a timetrace of an exponential with a, tau, c
+    and sprinkle in a normally distributed noise with a noise_sd.'''
+    t = np.arange(0, tEnd, tInc)
+    trace = a*np.exp(-t/tau) + c
+    trace += np.random.normal(0, noise_sd, len(trace))
+
+    return t, trace
+
+
+

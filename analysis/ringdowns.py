@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from dataclasses import dataclass, field
-from ringdown import Ringdown, generate_test_timetrace
+from ringdown.analysis.ringdown import Ringdown, generate_test_timetrace
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
@@ -93,3 +93,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

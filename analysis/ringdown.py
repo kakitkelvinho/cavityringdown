@@ -24,9 +24,15 @@ class Ringdown:
     tau_err: float = field(default=0, init=False, repr=False)
 
     def __post_init__(self):
+        self.t0 = self.findpeak()
         popt, pcov = self.fit()
         self.tau = popt[1]
         self.tau_err = np.sqrt(np.diag(pcov))[1]
+
+    def findpeak(self, rolloff:float=0.5e-6):
+        # cropping the basic attributes or taking the log
+        return self.t[np.argmax(self.timetrace[:round(len(self.timetrace)/2)])] + rolloff # find the max that lies in the first half of the array
+
 
 
     def fit(self, t0=None, window=None, p0=[0.2, 1e-6, 0.], plot=False,):
@@ -47,12 +53,12 @@ class Ringdown:
         self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
         # fit timetrace
-        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0)
+        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, bounds=([0,0,-5],[10,10e-6,5]))
         
         # get residuals
         residuals = self.logtimetrace - self.fit_func(self.t_crop, *popt)
         # calculate rmse
-        rmse = np.sqrt(np.sum(residuals*residuals)/(len(self.logtimetrace)-3))
+        #rmse = np.sqrt(np.sum(residuals*residuals)/(len(self.logtimetrace)-3))
 
         ### EDIT LATER
         if plot:
@@ -69,9 +75,9 @@ class Ringdown:
         mask = np.logical_and(self.t >= t0, self.t <= t0+window)
         # check whether any value in the *cropped* timetrace is less than zero
         # if yes offset the timetrace, because otherwise it messes up fit
-        timetrace = self.timetrace[mask]
-        if np.any(timetrace) <= 0:
-            timetrace -= np.min(timetrace) + offset
+        timetrace = self.timetrace[mask] - np.min(self.timetrace) + offset
+        #if np.any(timetrace) <= 0:
+        #    timetrace -= np.min(timetrace) + offset
         cropnormtimetrace = timetrace / np.max(timetrace)
         logtimetrace = np.log(cropnormtimetrace)
         t_crop = self.t[mask]

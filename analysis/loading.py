@@ -1,6 +1,6 @@
 import numpy as np
-from ringdown.analysis.ringdown import Ringdown
-from ringdown.analysis.ringdowns import Ringdowns
+from .ringdown import Ringdown
+from .ringdowns import Ringdowns
 import csv
 import os
 

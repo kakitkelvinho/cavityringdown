@@ -4,6 +4,34 @@
 
 This is a package for analyzing the timetrace of a cavity ringdown experiment.
 
+## Overview
+
+A graphical summary or a cheatsheet of this package is as follows:
+
+```
+# Structure
+
+Ringdowns
+├Ringdown
+├Ringdown
+├Ringdown
+├Ringdown
+├Ringdown
+
+# Working with csv
+experiment = Experiment('path/to/folder')
+# path to folder has structure /folder/setting/ringdown{n}.csv
+
+# Methods with Ringdown
+ringdown = Ringdown(timetrace=timetrace, t=t)
+popt, pcov = ringdown.fit(plot=True)
+
+# Methods with Ringdowns
+ringdowns = Ringdowns(name="name", ringdowns=[ringdown1, ringdown2,...])
+taus, tau_err = ringdowns.get_taus()
+ringdowns.plot_taus()
+```
+
 ## Usage
 
 This package makes no assumptions about how to run your experiments and how you store your data. What it requires is an array of time and and array of the intensity. By passing on these two arrays, in other words the $x$ and $y$ of your experiment, it can fit to it and tell you the decay time constants of experiment.

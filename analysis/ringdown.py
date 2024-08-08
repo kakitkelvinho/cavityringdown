@@ -53,7 +53,7 @@ class Ringdown:
         self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
         # fit timetrace
-        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, bounds=([0,0,-5],[10,10e-6,5]))
+        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0)
         
         # get residuals
         residuals = self.logtimetrace - self.fit_func(self.t_crop, *popt)

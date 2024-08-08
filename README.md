@@ -1,4 +1,4 @@
-![test status](https://github.com/kakitkelvinho/cavityringdown/actions/workflows/python-app.yml/badge.svg)
+![test status](https://github.com/kakitkelvinho/cavityringdown/actions/workflows/python-app.yml/badge.svg?event=push)
 # Ringdown 
 
 ## Introduction 

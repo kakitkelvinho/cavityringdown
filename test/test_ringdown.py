@@ -44,6 +44,7 @@ class TestRingdown(unittest.TestCase):
         t, trace = self.generate_timetrace(a, tau, c, a/80)
 
         ringdown = Ringdown(timetrace=trace, t=t)
+        ringdown.t0 = 0.
 
         std = ringdown.exp_residual()
 

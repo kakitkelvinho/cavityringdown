@@ -8,15 +8,15 @@ This is a package for analyzing the timetrace of a cavity ringdown experiment.
 
 A graphical summary or a cheatsheet of this package is as follows:
 
-```
+```python
 # Structure
 
-Ringdowns
-├Ringdown
-├Ringdown
-├Ringdown
-├Ringdown
-├Ringdown
+# Ringdowns
+# ├Ringdown
+# ├Ringdown
+# ├Ringdown
+# ├Ringdown
+# ├Ringdown
 
 # Working with csv
 experiment = Experiment('path/to/folder')
@@ -34,12 +34,12 @@ ringdowns.plot_taus()
 
 ## Usage
 
-This package makes no assumptions about how to run your experiments and how you store your data. What it requires is an array of time and and array of the intensity. By passing on these two arrays, in other words the $x$ and $y$ of your experiment, it can fit to it and tell you the decay time constants of experiment.
+This package makes no assumptions about how to run your experiments and how you store your data. What it requires is an array of time and array of the intensity. By passing on these two arrays, in other words the $x$ and $y$ of your experiment, it can fit to it and tell you the decay time constants of experiment.
 
 ### Imports
 
 The structure of the directory is as follows:
-```
+```python
 analysis
 ├── loading.py
 ├── ringdown.py
@@ -48,14 +48,14 @@ analysis
 
 To import the package to run in your script you can for example run:
 
-```
+```python
 from ringdown.analysis.ringdowns import Ringdowns 
 from ringdown.analysis.ringdown import Ringdown
 ```
 
 Optionally, if your data structure permits (to be explained later):
 
-```
+```python
 from ringdown.analysis.loading import Experiment
 ```
 
@@ -67,11 +67,11 @@ This offers a class to help you read into your experimental data and partition t
 
 The basic of classes are a `Ringdown` class, which is created by passing an array for time and an array for the timetrace.
 
-```
+```python
 ringdown = Ringdown(timetrace=timetrace, t=t)
 ```
 The numpy arrays `timetrace` and `t` could be obtained from your experimental data. For demonstration purposes, we can also generate a timetrace and 'load' it into an instance of the `Ringdown` class.
-```
+```python
 # helper function in ringdown.py to generate a time trace
 # used in the unit test
 
@@ -97,20 +97,20 @@ ringdown = Ringdown(timetrace=trace, t=t)
 Upon instantiating the `Ringdown` class, the class would automatically set a window or a region of interest in which a fit can be performed. This is performed by identifying the start time of the decay, in which case is identified by the time at which the intensity has the maximum value. The window is set to a default value of 1.5 $\mu$s, but this can be adjusted manually either by directly accessing the attribute or by passing `window` as a parameter to the `fit()` method. 
 
 Once the class is instantiated, a fit can be performed. This is simply performed by the method `fit()`, which is called as follows:
-```
+```python
 ringdown = Ringdown(timetrace=timetrace, t=t)
 popt, pcov = ringdown.fit()
 ```
 We assume that the cavity ringdown is described by an exponential:
 $$ I(t) = I_0 \exp(-\frac{t}{\tau}) + C $$
 Programmatically, we denote $I_0$ by `a`, $\tau$ by `tau` and $C$ by `offset`. We also take the natural log of the decay to perform a (close to) linear fit using the `scipy.optimize.curve_fit` function. Thus, the fitting function, defined in the method `fit_func` is defined by `np.log(a*np.exp(-t/tau)+c)`, and calling the `fit` method performs a fit and returns the best fit parameters `popt` and the covariance matrix `pcov`. The order of the parameters are given as follows.
-```
+```python
 popt, pcov = ringdown.fit(plot=True)
 a, tau, c = popt
 sigma_a, sigma_tau, sigma_c = np.sqrt(np.diag(pcov))
 ```
 Passing `plot=True` as a parameter would also generate a graph with the following layout:
-```
+```python
         |---------------|
         |       |       |
         |       |   2.  |        
@@ -136,7 +136,7 @@ In this figure:
 #### Collection of Ringdowns
 
 As with most experiments, you never only do one measurements. You often repeatedly take many such ringdowns with the same experimental parameters. For example, for our ringdown measurements, we keep all parameters the same except for the angle of  polarizer situated right before our detector. Therefore, we would repeat a ringdown measurement 50 times for having a polarizer at an oritentation of $50^\circ$. It would be inconvenient to instantiate a ringdown for each of the 50 measurements, say by running:
-```
+```python
 # NOT RECOMMENDED but possible
 ringdown1 = Ringdown(t=t0, timetrace=timetrace0)
 ringdown1 = Ringdown(t=t1, timetrace=timetrace1)
@@ -147,7 +147,7 @@ ringdown4 = Ringdown(t=t4, timetrace=timetrace4)
 ```
 As such there is another class which allows you create a 'collection' of `Ringdown`. This class is known as `Ringdowns` and works like a python list, supporting in-place addition or appending with the `append` and `__add__` method. To instantiate `Ringdowns`, you pass in a name as an argument (which is also optional), and you can either incrementally add to its lists of `Ringdown` or instantiate it by passing the list to it already:
 
-```
+```python
 import numpy as np
 
 # lets say I generate a nested list of 50 time arrays and 50 timetraces

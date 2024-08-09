@@ -5,6 +5,16 @@
 
 This is a package for analyzing the timetrace of a cavity ringdown experiment.
 
+## Installation
+
+Easiest way to use this is to install via pip:
+
+```bash
+pip install cavityringdown==0.0.1
+```
+
+For more details please visit the (https://pypi.org/project/cavityringdown/0.0.1/)[pypi] website.
+
 ## Overview
 
 A graphical summary or a cheatsheet of this package is as follows:

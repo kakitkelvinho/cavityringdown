@@ -47,7 +47,7 @@ class TestRingdown(unittest.TestCase):
 
         std = ringdown.exp_residual()
 
-        self.assertAlmostEqual(round(std*np.max(ringdown.timetrace),2), round(a/80,2), 2, "Noise statistic does not fit.")
+        self.assertAlmostEqual(round(std*np.max(ringdown.timetrace),3), round(a/80,3), 2, "Noise statistic does not fit.")
         
         
 

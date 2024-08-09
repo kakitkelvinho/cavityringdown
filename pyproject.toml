@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cavityringdown"
+version = "0.0.1"
+authors = [
+	{ name="Kelvin Ho", email="kelvin.ho@uibk.ac.at"}
+]
+description = "A package which analyzes cavity transmission ringdown to find the finesse of a cavity"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/kakitkelvinho/cavityringdown"
+

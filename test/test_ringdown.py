@@ -2,9 +2,8 @@ import unittest
 import numpy as np
 import sys
 
-sys.path.append('../analysis')
 
-from analysis.ringdown import Ringdown
+from cavityringdown.ringdown import Ringdown
 
 class TestRingdown(unittest.TestCase):
 

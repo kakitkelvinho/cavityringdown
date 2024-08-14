@@ -57,7 +57,7 @@ class Ringdowns:
 
     ## Plotting methods
 
-    def plot_taus(self, fontsize=18):
+    def plot_taus(self, fontsize=18, show=True, path='', name='plot_taus.png'):
         taus, tau_errs = self.get_taus()
         mean_taus = np.mean(taus)
         std_taus = np.std(taus, ddof=1)
@@ -75,7 +75,11 @@ class Ringdowns:
         plt.grid(visible=True, which='minor', axis='both')
         plt.gca().xaxis.set_minor_locator(AutoMinorLocator(5))
         plt.xticks(np.arange(0, len(taus)+1, 5))
-        plt.show()
+        if show:
+            plt.show()
+        if path != '':
+            plt.savefig(os.path.join(path, name))
+
 
 
 def main():

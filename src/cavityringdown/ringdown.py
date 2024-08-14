@@ -4,6 +4,7 @@ import matplotlib.gridspec as gridspec
 from dataclasses import dataclass, field
 from scipy.optimize import curve_fit
 from uncertainties import ufloat
+import os
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
@@ -94,7 +95,7 @@ class Ringdown:
         return np.std(residual_from_exp, ddof = 1)
         
 
-    def plot_fit(self, popt, pcov):
+    def plot_fit(self, popt, pcov, path='', name='plot_fit.png'):
         '''
         Plots the ringdown (1), log ringdown + fit (2) and residuals (3), 
         and the cropped ringdown + fit (4) and residual (5)
@@ -177,6 +178,11 @@ class Ringdown:
         ax5.set_xlabel("Time ($\\mu$s)")
         
         plt.show()
+
+        if path != '':
+            plt.savefig(os.path.join(path, name))
+
+        return fig
 
 
 def generate_test_timetrace(a, tau, c, noise_sd, tEnd=2e-6, tInc=2.5e-10):

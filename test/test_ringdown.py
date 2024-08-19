@@ -36,6 +36,22 @@ class TestRingdown(unittest.TestCase):
                          fit is {popt[1]} while tau is {tau}."
         self.assertAlmostEqual(tau, popt[1], 4, message_tau)
 
+    def test_t0(self):
+        '''Test whether windowing works'''
+        a, tau, c = [0.8, 1.2e-6, 0.]
+        t, trace = self.generate_timetrace(a, tau, c, a/80)
+
+        ringdown = Ringdown(timetrace=trace, t=t, t0=0.3e-6)
+        self.assertEqual(ringdown.t0, 0.3e-6)
+
+    def test_window(self):
+        '''Test whether windowing works'''
+        a, tau, c = [0.8, 1.2e-6, 0.]
+        t, trace = self.generate_timetrace(a, tau, c, a/80)
+
+        ringdown = Ringdown(timetrace=trace, t=t, t0=0.3e-6, window=2.5e-6)
+        self.assertEqual(ringdown.window, 2.5e-6)
+
 
 #    def test_noise(self):
 #        '''Test to see whether the correct noice statistic can be recovered'''

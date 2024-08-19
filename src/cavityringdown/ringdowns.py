@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from dataclasses import dataclass, field
+import os
 from .ringdown import Ringdown, generate_test_timetrace
 
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -65,7 +66,7 @@ class Ringdowns:
         plt.figure(figsize=(10,8), layout='constrained')
 
         plt.errorbar(x=np.arange(0, len(taus)), y=np.array(taus)/1e-6, yerr=np.array(tau_errs)/1e-6, capsize=0.5, marker='x', ls='', ecolor='black')
-        plt.axhline(mean_taus/1e-6, label=f"mean $\\tau$: {mean_taus:.2e} s", color='gray', linestyle='--')
+        plt.axhline(mean_taus/1e-6, label=f"mean $\\tau$: {mean_taus:.2e} s, av. err: {np.mean(tau_errs):.2e} s", color='gray', linestyle='--')
         plt.axhspan((mean_taus + std_taus)/1e-6, (mean_taus - std_taus)/1e-6, fill=0, ls='--', color='red', label=f"$\\sigma$ = {std_taus:.2e} s")
         plt.legend()
         plt.xlabel("Measurement number", fontsize=fontsize-2)

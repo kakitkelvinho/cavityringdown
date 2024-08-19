@@ -49,7 +49,7 @@ class TestRingdown(unittest.TestCase):
         a, tau, c = [0.8, 1.2e-6, 0.]
         t, trace = self.generate_timetrace(a, tau, c, a/80)
 
-        ringdown = Ringdown(timetrace=trace, t=t, t0=0.3e-6, window=2.5e-6)
+        ringdown = Ringdown(timetrace=trace, t=t, t0=0.3e-6, window=0.5e-6)
         self.assertEqual(ringdown.window, 2.5e-6)
 
 

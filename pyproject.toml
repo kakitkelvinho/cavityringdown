@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cavityringdown"
-version = "0.0.1"
+version = "0.0.3"
 authors = [
 	{ name="Kelvin Ho", email="kelvin.ho@uibk.ac.at"}
 ]

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from dataclasses import dataclass, field
 from scipy.optimize import curve_fit
-from uncertainties import ufloat
 import os
+from typing import Optional
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
@@ -13,8 +13,8 @@ class Ringdown:
     timetrace: np.ndarray = field(repr=False)
     t: np.ndarray = field(repr=False)
     pa_angle: int = field(default=0, init=False)
-    t0: float = field(default=0., init=False, repr=False) # start of window
-    window: float = field(default=1.5e-6, init=False, repr=False) # size of window
+    t0: Optional[float] = field(default=None, init=True, repr=False) # start of window
+    window: float = field(default=1.5e-6, init=True, repr=False) # size of window
 
     t_crop: np.ndarray = field(repr=False, init=False)
     mask: np.ndarray = field(repr=False, init=False)
@@ -25,7 +25,8 @@ class Ringdown:
     tau_err: float = field(default=0, init=False, repr=False)
 
     def __post_init__(self):
-        self.t0 = self.findpeak()
+        if self.t0 == None:
+            self.t0 = self.findpeak()
         popt, pcov = self.fit()
         self.tau = popt[1]
         self.tau_err = np.sqrt(np.diag(pcov))[1]
@@ -114,7 +115,6 @@ class Ringdown:
         |---------------|
         '''
         delta_tau = np.sqrt(pcov[1][1])
-        tau_u = ufloat(popt[1], delta_tau)
         fig = plt.figure(figsize=(15,8))
         fig.suptitle("Ringdowns and Fits", fontsize=20)
         subfigs = fig.subfigures(1,2, wspace=0.01)
@@ -141,7 +141,7 @@ class Ringdown:
         ax2 = right[0].add_subplot(righttop[0])
         ax2.set_title("Log of intensity")
         ax2.plot(self.t_crop/1e-6, self.logtimetrace, label="log", marker='.', ls='none', markersize=1, alpha=0.6, color='tab:red')
-        ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: ${tau_u:.2eL}$ s", color='darkmagenta')
+        ax2.plot(self.t_crop/1e-6, self.fit_func(self.t_crop, *popt), label=f"$\\tau$: ${popt[0]:.2eL}({delta_tau:.2eL})$ s", color='darkmagenta')
         ax2.tick_params(labelbottom=False)
         ax2.set_ylabel("Intensity (V)")
         ax2.legend(markerscale=10)
@@ -193,6 +193,21 @@ def generate_test_timetrace(a, tau, c, noise_sd, tEnd=2e-6, tInc=2.5e-10):
     trace += np.random.normal(0, noise_sd, len(trace))
 
     return t, trace
+
+def main():
+    '''Test whether windowing works'''
+    a, tau, c = [0.8, 1.2e-6, 0.]
+    t, trace = generate_test_timetrace(a, tau, c, a/80)
+
+    ringdown = Ringdown(timetrace=trace, t=t, t0=0.4e-6, window=2.5e-6)
+    ringdownb = Ringdown(timetrace=trace, t=t)
+    print(ringdown.t0)
+    print(ringdown.window)
+    print(ringdownb.t0)
+    print(ringdownb.window)
+
+if __name__ == '__main__':
+    main()
 
 
 

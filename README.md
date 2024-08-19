@@ -13,7 +13,7 @@ Easiest way to use this is to install via pip:
 pip install cavityringdown
 ```
 
-For more details please visit the (https://pypi.org/project/cavityringdown)[pypi] website.
+For more details please visit the (https://pypi.org/project/cavityringdown/)[pypi] website.
 
 ## Overview
 

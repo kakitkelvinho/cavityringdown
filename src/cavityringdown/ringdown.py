@@ -168,7 +168,6 @@ class Ringdown:
         ax3.set_xlabel("Time ($\\mu$s)")
         
         right[1].subplots_adjust(hspace=0)
-        print(popt[0])
         ax4 = right[1].add_subplot(rightbottom[0])
         ax4.set_title("Cropped and Normalized Intensity")
         ax4.plot(self.t_crop/1e-6, self.cropnormtimetrace, marker='.', ls='', markersize=1, alpha=0.6, label="cropped and normalized", color='tab:green')

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from scipy.optimize import curve_fit
 import os
 from typing import Optional
+from cavityringdown.loading import get_csv
 
 plt.style.use('seaborn-v0_8-whitegrid')
 
@@ -55,9 +56,10 @@ class Ringdown:
         self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
         # error
-        error = 180e-3 * 0.03 * np.ones_like(self.logtimetrace)# 3% of full scale, taking 20mV to be the step size
+        error = 180e-3 * 0.3 * np.ones_like(self.logtimetrace)# 3% of full scale, taking 20mV to be the step size
         # fit timetrace
-        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, sigma=error, absolute_sigma=False)
+        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, sigma=error, absolute_sigma=True)
+        #popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, )
         
         # get residuals
         residuals = self.logtimetrace - self.fit_func(self.t_crop, *popt)
@@ -211,17 +213,21 @@ def generate_test_timetrace(a, tau, c, noise_sd, tEnd=2e-6, tInc=2.5e-10):
 def main():
     '''Test whether windowing works'''
     a, tau, c = [0.8, 1.2e-6, 0.]
-    t, trace = generate_test_timetrace(a, tau, c, a/80)
-    t2, trace2 = generate_test_timetrace(a, tau, c, a/80)
+    #t, trace = generate_test_timetrace(a, tau, c, a/80)
+    t2, trace2 = generate_test_timetrace(a, tau, c, a/80) 
+    path = '/home/kelvin/LabInnsbruck/WindowsData/20240715_Ringdown/PA_40/'
+    files = os.listdir(path)
+    file = files[4]
+    t, trace = get_csv(os.path.join(path, file), index=0)
 
-    ringdown = Ringdown(timetrace=trace, t=t, t0=0.4e-6, window=0.6e-6)
+    ringdown = Ringdown(timetrace=trace, t=t)
     ringdownb = Ringdown(timetrace=trace, t=t)
     print(ringdown.t0)
     print(ringdown.window)
     print(ringdownb.t0)
     print(ringdownb.window)
 
-    ringdown.fit(additional_trace=trace2 - 0.01, plot=True, show=True)
+    ringdown.fit(additional_trace=trace - 0.01, plot=True, show=True)
 
 if __name__ == '__main__':
     main()

@@ -54,15 +54,17 @@ class Ringdown:
 
         self.t_crop, self.mask, self.cropnormtimetrace, self.logtimetrace = self.create_logtimetrace(t0, window)
 
+        # error
+        error = 180e-3 * 0.03 * np.ones_like(self.logtimetrace)# 3% of full scale, taking 20mV to be the step size
         # fit timetrace
-        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0)
+        popt, pcov = curve_fit(self.fit_func, xdata=self.t_crop, ydata=self.logtimetrace, p0=p0, sigma=error, absolute_sigma=False)
         
         # get residuals
         residuals = self.logtimetrace - self.fit_func(self.t_crop, *popt)
         # calculate rmse
         #rmse = np.sqrt(np.sum(residuals*residuals)/(len(self.logtimetrace)-3))
 
-        ### EDIT LATER
+        ### Might be weird to return fig or fit results
         if plot:
             fig = self.plot_fit(popt, pcov, show=show, additional_trace=additional_trace)
             return fig

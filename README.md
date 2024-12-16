@@ -20,6 +20,9 @@ For more details please visit the https://pypi.org/project/cavityringdown/ websi
 A graphical summary or a cheatsheet of this package is as follows:
 
 ```python
+# imports
+from cavityringdown.ringdown import Ringdown
+from cavityringdown.ringdowns import Ringdowns
 # Structure
 
 # Ringdowns
@@ -60,14 +63,14 @@ analysis
 To import the package to run in your script you can for example run:
 
 ```python
-from ringdown.analysis.ringdowns import Ringdowns 
-from ringdown.analysis.ringdown import Ringdown
+from cavityringdown.ringdowns import Ringdowns 
+from cavityringdown.ringdown import Ringdown
 ```
 
 Optionally, if your data structure permits (to be explained later):
 
 ```python
-from ringdown.analysis.loading import Experiment
+from ringdown.loading import Experiment
 ```
 
 This offers a class to help you read into your experimental data and partition them into `Ringdown` and `Ringdowns`.
